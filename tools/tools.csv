@@ -1,0 +1,13 @@
+Tool_ID,Keywords,Func_Desc,Args_Schema,Yields,Pre_Req
+try_agent,"analyze,generate,code,write","General purpose AI sub-agent for complex tasks","prompt: str","result",None
+ls,"list,dir,files","list directory contents","args: str (e.g. -la /path)","stdout",None
+pwd,"cwd,path","print working directory","None","current_path",None
+cat,"read,view","concatenate and print files","file: str (path)","content",None
+grep,"search,find,match","print lines matching a pattern","args: str (e.g. -rn 'error' .)","matched_lines",None
+find,"locate,search_file","search for files in a directory hierarchy","args: str (e.g. . -name '*.py')","file_list",None
+df,"disk,space,storage","report file system disk space usage","args: str (e.g. -h)","disk_info",None
+free,"memory,ram","display amount of free and used memory","args: str (e.g. -m)","mem_info",None
+ps,"process,cpu,tasks","report a snapshot of current processes","args: str (e.g. aux)","proc_list",None
+ip,"network,addr,interface","show/manipulate routing, devices, policy routing","args: str (e.g. addr)","net_info",None
+uptime,"load,runtime","tell how long the system has been running","None","load_avg",None
+du,"disk_usage,folder_size","estimate file space usage","args: str (e.g. -sh .)","dir_size",None

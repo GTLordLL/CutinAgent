@@ -1,0 +1,16 @@
+# --- Python 相关 ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+
+# --- 编辑器与系统相关 ---
+.vscode/
+
+

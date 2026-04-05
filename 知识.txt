@@ -1,0 +1,106 @@
+# 上下文通常被划分为以下四个核心部分：
+### 1. 系统提示词 (System Prompt / System Message)
+这是上下文的“根基”，通常排在最前面。它定义了模型的**身份、能力边界和行为准则**。
+* **内容：** 角色设定（如“你是一个资深的嵌入式工程师”）、任务目标、回复风格、禁止事项。
+* **工具调用场景：** 这里会包含工具的使用说明（Tool Definitions），告诉模型有哪些 API 可以调用，以及调用参数的格式。
+
+### 2. 用户输入 (User Message)
+这是用户当前发送的具体指令或问题。
+* **内容：** 核心请求、上传的文件内容、或者对上一步结果的反馈。
+* **注意：** 如果用户上传了代码（如一个 SpringBoot 的 Controller），这部分 Token 占用通常是最大的。
+
+### 3. 历史对话记录 (Chat History / Assistant Message)
+为了让 AI 具有“记忆”，之前的每一轮对话都会被重新塞进上下文窗口。
+* **内容：** 过去几轮 User 和 Assistant 的交替对话。
+* **管理：** 随着对话变长，这部分会迅速吃掉 Token。如果达到 8k 限制，系统通常会通过“滑动窗口”丢弃最早的对话，或者对旧对话进行摘要压缩。
+
+### 4. 工具调用与返回结果 (Tool Call & Tool Outputs)
+这是 Agent 模式下特有的部分。当模型决定使用工具时，上下文中会新增两类信息：
+* **Tool Call (模型输出)：** 模型生成的调用指令，例如：`call: get_weather(city="Beijing")`。
+* **Tool Output (外部输入)：** 系统执行工具后返回的真实数据，例如：`result: {"temp": "15°C", "condition": "Cloudy"}`。
+* **后续：** 模型会根据这个 Output 再次组织语言，给用户一个最终的回答。
+
+----------------------------------
+以下是实现一个最小可行性（MVP）Agent 助手需要优先攻克的 **4 个核心模块**：
+## 1. 统一模型适配层 (The Connector)
+这是你之前在 OpenClaw 报错最严重的地方。你需要实现一个屏蔽底层差异的 `Chat` 类，能够丝滑切换本地 Ollama 和云端智谱。
+
+* **核心功能**：支持 **流式输出 (Streaming)** 和 **消息历史管理**。
+* **技术点**：建议直接使用 `httpx` 或 `openai` 官方 SDK（因为智谱和 Ollama 都兼容 OpenAI 协议）。
+* **你的优势**：你可以直接在代码里硬编码 `base_url`，彻底告别 404 路径拼接 Bug。
+
+## 2. 结构化输出解析器 (The Parser)
+Agent 的本质是 LLM 输出**特定格式命令**。你需要让模型不再只是“聊天”，而是输出能够被 Python 执行的 JSON 或特定标记。
+* **实现方式**：
+    * **方法 A (Prompt 工程)**：在 System Prompt 里规定：“如果你要读取文件，请输出 `Action: read_file(path)`”。
+    * **方法 B (Function Calling)**：利用智谱或 Qwen 的工具调用能力，直接获取结构化的 JSON 响应。
+* **关键任务**：写一个正则表达式或 JSON 解析逻辑，从模型的一堆废话中精准提取出“指令”。
+
+## 3. 本地工具箱 (The Toolbelt)
+这是 Agent 的“手脚”。你需要写一系列 Python 函数，并把它们暴露给模型。针对你的毕业设计，你最需要这三个工具：
+| 工具名称 | 功能描述 | 实现方式 (Python) |
+| :--- | :--- | :--- |
+| **FileIO** | 读取/写入你的 SpringBoot 源码 | `os.listdir`, `open().read()` |
+| **ShellExecutor** | 自动运行 `mvn clean install` 或 Docker 命令 | `subprocess.run` |
+| **ProjectScanner** | 递归扫描目录树，告诉模型项目结构 | `os.walk` |
+
+## 4. 任务循环引擎 (The ReAct Loop)
+这是 Agent 的“大脑意识流”。它决定了 Agent 是不是能“思考一步，做一步”。
+
+* **逻辑流程**：
+    1.  **Receive**: 接收你的指令（如“分析库存逻辑”）。
+    2.  **Think**: 模型判断需要看哪些代码。
+    3.  **Act**: 脚本执行 `read_file` 工具。
+    4.  **Observe**: 把读取到的源码内容再塞回给模型。
+    5.  **Repeat**: 直到模型给出最终结果。
+
+-----------------------------------------
+
+# Qwen2.5-Coder:7B 的“不听话”问题
+Qwen2.5-Coder:7B 的代码生成权重（Priority）高得惊人，它甚至会为了保持代码块的整洁，而过滤掉<tool_call></tool_call>标签。
+在进行function calling时不会输出<tool_call></tool_call>，所以ollama库无法识别，但是他输出的json并没有错。
+所以，如果要让Qwen2.5-Coder使用函数调用功能，不能直接用ollama提取，需要手动提取他输出的json
+
+---------------------------------------------
+大模型参数设置优先级顺序（从高到低）
+如果你在多个地方设置了同一个参数，优先级如下：
+1.Python API options（最高优先级，会覆盖一切）
+2.Modelfile 中的 PARAMETER
+3.模型原始定义的默认值
+
+都可以通过 Modelfile 和 Python 修改
+SYSTEM (角色设定)
+    Modelfile: 使用 SYSTEM """...""" 指令。这是“出厂设置”，只要加载这个模型，人设就固定了。
+    Python: 在 messages 列表的第一条添加 {'role': 'system', 'content': '...'}。这是“临时剧本”，优先级高于 Modelfile，会覆盖掉出厂的人设。
+
+TEMPLATE (对话模版)
+    Modelfile: 使用 TEMPLATE """...""" 指令。这是修改模型行为最硬核的方式。你之前的标签丢失问题，本质上就是这里的模版规定了要带标签，但模型没学会。
+    Python: 不能直接修改。 Ollama 的 Python SDK 会根据你调用的模型自动套用 Modelfile 里的模板。如果你想改模板，必须 create 一个新模型。
+
+TOOLS (函数定义)
+    Modelfile: 可以在模板中硬编码（不推荐），或者在最新版 Ollama 中通过特定的 TEMPLATE 语法预留位置。
+    Python: 通过 ollama.chat(tools=[...]) 动态传入。这是最常用的方式，因为你的工具（如查天气、查数据库）通常是根据业务逻辑动态变化的。
+
+三者如何转化成 Tokens 消耗空间？
+这是一个“层层嵌套”的过程。假设你发了一句“你好”，模型实际收到的文本流（即消耗的 Tokens）如下：
+    第一层 (TEMPLATE)：模版先把框架搭好，比如 <|im_start|>system。
+    第二层 (SYSTEM)：把系统提示词塞进第一层。
+    第三层 (TOOLS)：如果 Python 传了 tools，Ollama 会根据 TEMPLATE 里的定义，把函数列表转化为一大段 JSON 文本，塞进系统提示词后面。
+    第四层 (USER)：最后才把你那句“你好”塞进 <|im_start|>user 标签里。
+注意： 即使你只说两个字，这四层加起来可能就已经消耗了 300-500 Tokens。
+
+总结：你应该在哪里修改？
+针对你目前的 MyClaw 项目：
+    改 SYSTEM：当你觉得模型“笨”，不听指令，或者废话太多时，在 Python 里改最快；如果想一劳永逸，在 Modelfile 里改。
+    改 TEMPLATE：只有当模型输出格式完全混乱（比如不吐标签、不换行）时，才去动 Modelfile。平时千万别动，容易改坏。
+    改 TOOLS：永远在 Python 代码里改。这样你可以根据 Agent 的不同状态，动态决定给模型展示哪些功能。
+
+-------------------------------------------------
+4096 ctx: 4812+(4×100)=5212MB (剩余 ~900MB，极度安全，100% GPU)
+8192 ctx: 4812+(8×100)=5612MB (剩余 ~500MB，依然安全，100% GPU)
+10240 ctx: 剩余空间：6144−5900=244MB。
+12288 ctx: 4812+(12×100)=6012MB (剩余 ~130MB，危险边缘，容易掉速)
+
+
+try_agent,"analyze,generate,code,write,calculate","General purpose AI sub-agent for complex tasks","prompt: str","result",None
+
