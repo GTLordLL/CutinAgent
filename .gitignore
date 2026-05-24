@@ -9,8 +9,18 @@ build/
 dist/
 *.egg-info/
 
-
 # --- 编辑器与系统相关 ---
 .vscode/
+.claude/
 
+# --- 运行时数据 ---
+history/
 
+# --- 内部讨论 ---
+讨论.md
+讨论5-23.md
+CLAUDE.md
+
+# --- 测试 ---
+test_results/
+tests/

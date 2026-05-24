@@ -1,13 +1,7 @@
-Tool_ID,Keywords,Func_Desc,Args_Schema,Yields,Pre_Req
-try_agent,"analyze,generate,code,write","General purpose AI sub-agent for complex tasks","prompt: str","result",None
-ls,"list,dir,files","list directory contents","args: str (e.g. -la /path)","stdout",None
-pwd,"cwd,path","print working directory","None","current_path",None
-cat,"read,view","concatenate and print files","file: str (path)","content",None
-grep,"search,find,match","print lines matching a pattern","args: str (e.g. -rn 'error' .)","matched_lines",None
-find,"locate,search_file","search for files in a directory hierarchy","args: str (e.g. . -name '*.py')","file_list",None
-df,"disk,space,storage","report file system disk space usage","args: str (e.g. -h)","disk_info",None
-free,"memory,ram","display amount of free and used memory","args: str (e.g. -m)","mem_info",None
-ps,"process,cpu,tasks","report a snapshot of current processes","args: str (e.g. aux)","proc_list",None
-ip,"network,addr,interface","show/manipulate routing, devices, policy routing","args: str (e.g. addr)","net_info",None
-uptime,"load,runtime","tell how long the system has been running","None","load_avg",None
-du,"disk_usage,folder_size","estimate file space usage","args: str (e.g. -sh .)","dir_size",None
+Tool_ID,Keywords,Func_Desc,Args_Schema,param_desc
+get_git_status,"GIT, status, porcelain, working-tree, branch",获取Git工作区状态（分支名+文件变更计数）。,{},无需参数。
+get_git_diff,"GIT, diff, changes",获取Git工作区代码变更差异（超200行截断）。,"{""staged"": ""bool (default false)""}",staged: 是否查看已暂存变更，默认False（查看未暂存）。
+get_git_log,"GIT, log, history, commits",获取Git提交历史记录（支持today/yesterday/Ndays时间过滤）。,"{""since"": ""str (default today)"", ""author"": ""str (optional)"", ""limit"": ""int (default 50)""}",since: 起始时间 today/yesterday/Ndays，默认today。author: 按作者筛选（可选）。limit: 返回条数，默认50，上限100。
+git_commit,"GIT, commit, stage, add",暂存指定文件并提交。第一个写操作工具，失败可用git reset --soft HEAD~1回滚。,"{""message"": ""str (commit message)"", ""files"": ""str (default . 表示全部)""}",message: 提交信息（必填）。files: 要暂存的文件路径，默认'.'表示全部。
+generate_commit_message,"GIT, commit-message, generate",调用LLM从git diff生成conventional commit message。,"{""data"": ""str (git diff输出)""}",data: git diff输出文本（必填），通常引用 VAR_get_git_diff。
+generate_daily_report,"GIT, daily-report, summary",调用LLM从git log生成今日变更日报。,"{""data"": ""str (git log输出)""}",data: git log输出文本（必填），通常引用 VAR_get_git_log。

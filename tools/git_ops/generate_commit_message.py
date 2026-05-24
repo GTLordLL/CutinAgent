@@ -1,0 +1,50 @@
+import os
+from langchain_ollama import ChatOllama
+from utils.streaming import stream_llm
+
+_PROMPT_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "prompts", "commit_message"
+)
+
+
+def _load_system_prompt() -> str:
+    path = os.path.join(_PROMPT_DIR, "system.md")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    return ""
+
+
+def generate_commit_message(data: str) -> dict:
+    """调用 LLM 从 git diff 生成 conventional commit message。"""
+    try:
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+        llm = ChatOllama(
+            model="qwen3:4b-instruct_q8_8k",
+            base_url=base_url,
+            temperature=0.2,
+            num_predict=512,
+        )
+
+        system_prompt = _load_system_prompt()
+        prompt = (
+            f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+            f"<|im_start|>user\nGit Diff:\n{data}<|im_end|>\n"
+            f"<|im_start|>assistant\n"
+        )
+
+        print("  [generate_commit_message] ", end="", flush=True)
+        message, _ = stream_llm(llm, prompt)
+        message = message.strip()
+
+        return {
+            "status": "成功",
+            "conclusion": "已生成 Commit Message",
+            "summary": message,
+            "detail": message,
+        }
+
+    except Exception as e:
+        return {"status": "失败", "conclusion": f"生成 commit message 时发生异常: {str(e)}", "summary": "", "detail": ""}

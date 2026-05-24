@@ -1,0 +1,76 @@
+"""SOP Markdown 文件加载与索引构建。"""
+import os
+import re
+
+
+def build_sop_library_index(sops_df) -> str:
+    """从CSV索引构造 SOP 匹配用的精简文本（含 Objective 和 Description，不含 Keywords 和 Plan_Steps）。"""
+    lines = []
+    for _, row in sops_df.iterrows():
+        sid = row["SOP_ID"]
+        obj = row["Objective"]
+        desc = row.get("Description", "")
+        lines.append(f"{sid} | {obj} | {desc}")
+    return "\n".join(lines)
+
+
+def load_sop_markdown(sop_id: str, sop_dir: str,
+                      valid_tool_ids: set | None = None) -> dict:
+    """加载单个 SOP 的完整 markdown 文件并解析各字段。
+    返回: {"objective": ..., "description": ..., "plan_steps": ..., "tools_required": ..., "keywords": ...}
+    若 valid_tool_ids 不为 None，则对 Plan_Steps 执行严格 DSL 校验。
+    """
+    file_path = os.path.join(sop_dir, f"{sop_id}.md")
+    if not os.path.exists(file_path):
+        print(f"[警告] SOP 文件不存在: {file_path}")
+        return {}
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    def extract_section(text: str, heading: str) -> str:
+        """提取 ## heading 之后的内容，直到下一个 ## 或文件尾。"""
+        pattern = rf'##\s+{heading}\s*\n(.*?)(?=\n##\s|\Z)'
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return ""
+
+    plan_steps = extract_section(content, "Plan_Steps")
+    retry_limit_text = extract_section(content, "Retry_Limit")
+
+    # SOP Plan_Steps 格式校验
+    if valid_tool_ids is not None and plan_steps:
+        from validator.SopSpecChecker import check_sop_plan_steps
+        errors = check_sop_plan_steps(plan_steps, valid_tool_ids)
+        if errors:
+            error_msg = "\n".join(
+                f"  L{e.line_number} S{e.step_number}: [{e.severity}] {e.message}"
+                for e in errors
+            )
+            raise ValueError(
+                f"SOP '{sop_id}' Plan_Steps 格式校验失败:\n{error_msg}"
+            )
+
+    # SOP Retry_Limit 校验
+    if valid_tool_ids is not None:
+        from validator.SopSpecChecker import check_retry_limit
+        errors = check_retry_limit(retry_limit_text)
+        if errors:
+            error_msg = "\n".join(
+                f"  [{e.severity}] {e.message}"
+                for e in errors
+            )
+            raise ValueError(
+                f"SOP '{sop_id}' Retry_Limit 校验失败:\n{error_msg}"
+            )
+
+    return {
+        "objective": extract_section(content, "Objective"),
+        "description": extract_section(content, "Description"),
+        "plan_steps": plan_steps,
+        "tools_required": extract_section(content, "Tools_Required"),
+        "keywords": extract_section(content, "Keywords"),
+        "exception_handling": extract_section(content, "Global_Exception_Handling"),
+        "retry_limit": extract_section(content, "Retry_Limit"),
+    }
