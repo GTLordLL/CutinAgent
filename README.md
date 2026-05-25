@@ -5,10 +5,7 @@
 基于 Python + LangGraph 的 **SOP 驱动型受控 Agent 框架**。将 LLM 的角色从"自主决策者"转变为"标准化作业程序（SOP）的数字执行员"，专为消费级硬件（RTX 3060 6GB）环境下的 **qwen3:4b** 模型设计。
 
 > **核心价值**：低成本（消费级硬件 + 4B 模型可跑）+ 数据完全本地（不上云，数据主权在你自己手里）。
->
-> **需要知道**：这不是一个"对话即服务"的聊天机器人。你需要编写 SOP（操作规范）来告诉 Agent 怎么做——SOP 编写有技术门槛，建议用 Claude Code 等大模型辅助编写和调试。
->
-> **一句话总结**：用 Markdown 写操作规范，4B 小模型本地执行——把 AI Agent 从"黑盒自主决策"变成"白盒流程执行"。
+
 
 ## 架构
 
@@ -16,20 +13,23 @@ v2 采用 **REPL 外层 + LangGraph 执行内层** 双层架构。REPL 提供交
 
 ## 核心设计
 
-6 个设计要点，每篇独立论述"做了什么、为什么这么做、不这么做会怎样"：
+8 大设计要点详见 [关键设计概述](intro/design/essentials/关键设计概述.md)，各要点独立论述"做了什么、为什么这么做、不这么做会怎样"：
 
-| 设计要点 | 文档 |
-|---------|------|
-| **人机协作网关** — 意图分类 + 三级渐进确认 + IS_EXECUTE 代码闸门 | [UserCoordinator设计.md](intro/design/essentials/UserCoordinator设计.md) |
-| **SOP 体系** — Markdown 即代码 + DSL 控制流 + 加载时 13 项校验 | [SOP体系设计.md](intro/design/essentials/SOP体系设计.md) |
-| **执行引擎** — Scheduler → ToolExecutor → ProgressUpdater 三节点循环 | [执行引擎设计.md](intro/design/essentials/执行引擎设计.md) |
-| **工具合约** — 四字段契约 + VariableStore + VAR_ 变量传递 | [工具合约设计.md](intro/design/essentials/工具合约设计.md) |
-| **历史压缩** — Compactor 评价 + 对话/执行历史压缩 + 代码管理生命周期 | [Compactor设计.md](intro/design/essentials/Compactor设计.md) |
-| **Thinker+Formatter** — 双阶段推理（temp 0.4 + 0.0）+ Validator 防幻觉 | [ThinkerFormatter设计.md](intro/design/essentials/ThinkerFormatter设计.md) |
+| # | 设计要点 | 核心思路 | 文档 |
+|---|---------|---------|------|
+| 1 | Thinker + Formatter 双阶段 | Thinker(temp 0.4)自由推理 + Formatter(temp 0.0)结构化提取 + Validator 重试兜底 | [ThinkerFormatter设计.md](intro/design/essentials/ThinkerFormatter设计.md) |
+| 2 | UserCoordinator 人机协作网关 | 五字段输出 + 三级渐进确认 + IS_EXECUTE 代码闸门 | [UserCoordinator设计.md](intro/design/essentials/UserCoordinator设计.md) |
+| 3 | Compactor 评价与历史压缩 | 三字段输出 + 代码管理历史生命周期 + 8K 上下文防溢出 | [Compactor设计.md](intro/design/essentials/Compactor设计.md) |
+| 4 | SOP 存储与校验 | Markdown 7 section + 加载时 13 项校验 + CSV 轻量索引 | [SOP体系设计.md](intro/design/essentials/SOP体系设计.md) |
+| 5 | 工具合约与变量传递 | 四字段统一契约 + 字典路由 + VAR_ 变量传递 | [工具合约设计.md](intro/design/essentials/工具合约设计.md) |
+| 6 | 进度更新与重试 | 纯代码机械拼接 + 4 种追加模式 + 剥离-重建重试策略 | [进度更新与重试设计.md](intro/design/essentials/进度更新与重试设计.md) |
+| 7 | 日志系统 | 按 round+node 分目录 + JSON 快照 + 文本日志互补 | [日志系统设计.md](intro/design/essentials/日志系统设计.md) |
+| 8 | 图结构与路由 | 3 节点硬编码路由 + task_status 字符串比对 + ProgressUpdater 无条件回 Scheduler | [图结构与路由设计.md](intro/design/essentials/图结构与路由设计.md) |
 
 更多文档：
-- 架构总览 — **[核心设计分析.md](intro/design/核心设计分析.md)**
+- 架构总览 — **[架构概述](intro/design/architecture/架构概述.md)** | **[架构论述](intro/design/architecture/架构.md)**
 - 解决的痛点 — **[痛点.md](intro/design/痛点.md)**
+- 任务与领域分类 — **[任务和领域分类.md](intro/design/任务和领域分类.md)**
 - 进度更新机制 — **[进度更新器设计手册.md](intro/design/进度更新器设计手册.md)**
 - REPL 模块设计 — **[repl设计文档.md](intro/design/repl设计文档.md)**
 - SOP 编写规范 — **[sop编写规范.md](intro/design/sop编写规范.md)**
@@ -46,7 +46,7 @@ v2 采用 **REPL 外层 + LangGraph 执行内层** 双层架构。REPL 提供交
 | NVIDIA 组件 | NVIDIA 驱动 + NVIDIA Container Toolkit |
 | Python | 3.10+ |
 
-> 完整从零配置教程见 **[环境配置说明.md](intro/环境配置说明.md)**。
+> 完整从零配置教程见 **[环境配置说明.md](intro/env/环境配置说明.md)**。
 
 ### 一键部署
 

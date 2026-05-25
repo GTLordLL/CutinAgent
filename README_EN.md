@@ -16,20 +16,23 @@ v2 uses a **REPL outer layer + LangGraph execution inner layer** dual architectu
 
 ## Core Design
 
-6 key design points, each with its own deep-dive document (Chinese only):
+8 key design points — see [Design Overview](intro/design/essentials/关键设计概述.md) for the full picture. Each point covered in its own deep-dive document (Chinese only):
 
-| Design Point | Document |
-|-------------|---------|
-| **Human-Agent Gateway** — intent classification + progressive confirmation + IS_EXECUTE code gate | [UserCoordinator设计.md](intro/design/essentials/UserCoordinator设计.md) |
-| **SOP System** — Markdown as code + DSL control flow + 13-rule load-time validation | [SOP体系设计.md](intro/design/essentials/SOP体系设计.md) |
-| **Execution Engine** — Scheduler → ToolExecutor → ProgressUpdater 3-node loop | [执行引擎设计.md](intro/design/essentials/执行引擎设计.md) |
-| **Tool Contract** — 4-field return contract + VariableStore + VAR_ references | [工具合约设计.md](intro/design/essentials/工具合约设计.md) |
-| **History Compaction** — Compactor evaluation + dialogue/execution compression + code-managed lifecycle | [Compactor设计.md](intro/design/essentials/Compactor设计.md) |
-| **Thinker+Formatter** — dual-phase inference (temp 0.4 + 0.0) + Validator anti-hallucination | [ThinkerFormatter设计.md](intro/design/essentials/ThinkerFormatter设计.md) |
+| # | Design Point | Core Idea | Document |
+|---|-------------|-----------|---------|
+| 1 | Thinker + Formatter Dual-Phase | Thinker (temp 0.4) free reasoning + Formatter (temp 0.0) structured extraction + Validator retry | [ThinkerFormatter设计.md](intro/design/essentials/ThinkerFormatter设计.md) |
+| 2 | UserCoordinator Gateway | 5-field output + 3-stage progressive confirmation + IS_EXECUTE code gate | [UserCoordinator设计.md](intro/design/essentials/UserCoordinator设计.md) |
+| 3 | Compactor History Compression | 3-field output + code-managed history lifecycle + 8K context overflow prevention | [Compactor设计.md](intro/design/essentials/Compactor设计.md) |
+| 4 | SOP Storage & Validation | Markdown 7-section + 13-rule load-time validation + CSV lightweight index | [SOP体系设计.md](intro/design/essentials/SOP体系设计.md) |
+| 5 | Tool Contract & Variable Passing | 4-field unified contract + dict-based dispatch + VAR_ variable references | [工具合约设计.md](intro/design/essentials/工具合约设计.md) |
+| 6 | Progress Update & Retry | Pure-code mechanical concatenation + 4 update modes + strip-rebuild retry strategy | [进度更新与重试设计.md](intro/design/essentials/进度更新与重试设计.md) |
+| 7 | Logging System | Per-round per-node directory structure + JSON snapshots + text log complement | [日志系统设计.md](intro/design/essentials/日志系统设计.md) |
+| 8 | Graph Structure & Routing | 3-node hardcoded routing + task_status string comparison + ProgressUpdater always returns to Scheduler | [图结构与路由设计.md](intro/design/essentials/图结构与路由设计.md) |
 
 More docs (Chinese):
-- Architecture overview — **[核心设计分析.md](intro/design/核心设计分析.md)**
+- Architecture overview — **[Architecture Overview](intro/design/architecture/架构概述.md)** | **[Architecture Deep Dive](intro/design/architecture/架构.md)**
 - Pain points solved — **[痛点.md](intro/design/痛点.md)**
+- Task & domain classification — **[任务和领域分类.md](intro/design/任务和领域分类.md)**
 - Progress update mechanism — **[进度更新器设计手册.md](intro/design/进度更新器设计手册.md)**
 - REPL module design — **[repl设计文档.md](intro/design/repl设计文档.md)**
 - SOP authoring guide — **[sop编写规范.md](intro/design/sop编写规范.md)**
@@ -46,7 +49,7 @@ More docs (Chinese):
 | NVIDIA | NVIDIA Driver + NVIDIA Container Toolkit |
 | Python | 3.10+ |
 
-> Full setup guide: **[ENVIRONMENT_SETUP.md](intro/ENVIRONMENT_SETUP.md)**.
+> Full setup guide: **[ENVIRONMENT_SETUP.md](intro/env/ENVIRONMENT_SETUP.md)**.
 
 ### One-Click Setup
 
