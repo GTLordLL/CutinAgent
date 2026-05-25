@@ -1,32 +1,33 @@
 def build_help_message(resources) -> str:
-    """构建 /help 信息。"""
+    """构建 /help 信息（Markdown 格式）。"""
     lines = [
-        "=" * 50,
-        "  CutinAgent REPL 命令列表",
-        "=" * 50,
+        "# CutinAgent REPL 命令列表",
         "",
-        "  /help      显示此帮助信息",
-        "  /sops      列出所有可用 SOP",
-        "  /history   显示当前对话与执行历史摘要",
-        "  /clear     清除对话历史",
-        "  /exit      退出 REPL",
+        "| 命令 | 说明 |",
+        "|------|------|",
+        "| `/help` | 显示此帮助信息 |",
+        "| `/sops` | 列出所有可用 SOP |",
+        "| `/history` | 显示当前对话与执行历史摘要 |",
+        "| `/clear` | 清除对话历史 |",
+        "| `/exit` | 退出 REPL |",
         "",
-        "--- 可用 SOP ---",
+        "## 可用 SOP",
+        "",
     ]
     for line in resources.sop_library_text.strip().split("\n"):
-        lines.append(f"  {line}")
+        lines.append(f"- {line}")
     return "\n".join(lines)
 
 
 def build_history_message(state: dict) -> str:
-    """构建 /history 信息。"""
-    lines = ["=" * 50, "  当前会话状态", "=" * 50]
+    """构建 /history 信息（Markdown 格式）。"""
+    lines = ["# 当前会话状态"]
     ch = state.get("conversation_history", "")
     eh = state.get("execution_history", "")
     cd = state.get("current_dialogue", "")
-    lines.append(f"\n--- 对话历史 ---\n{ch if ch else '(空)'}")
-    lines.append(f"\n--- 执行历史 ---\n{eh if eh else '(空)'}")
-    lines.append(f"\n--- 当前对话 ---\n{cd if cd else '(空)'}")
+    lines.append(f"\n## 对话历史\n\n{ch if ch else '(空)'}")
+    lines.append(f"\n## 执行历史\n\n{eh if eh else '(空)'}")
+    lines.append(f"\n## 当前对话\n\n{cd if cd else '(空)'}")
     return "\n".join(lines)
 
 
@@ -46,8 +47,10 @@ def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
         return True, build_help_message(resources), False
 
     if name == "/sops":
-        msg = "可用 SOP 列表:\n" + resources.sop_library_text
-        return True, msg, False
+        lines = ["# 可用 SOP 列表", ""]
+        for line in resources.sop_library_text.strip().split("\n"):
+            lines.append(f"- {line}")
+        return True, "\n".join(lines), False
 
     if name == "/clear":
         state["conversation_history"] = ""
