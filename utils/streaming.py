@@ -6,25 +6,30 @@ LLM 流式输出工具。
 """
 
 import sys
+import time
 from typing import Callable
 from langchain_core.messages import HumanMessage
 
 
 def stream_llm(llm, prompt_text: str, label: str = "",
-               live_callback: Callable[[str], None] | None = None) -> tuple[str, dict]:
-    """流式调用 LLM，实时输出 token。
+               live_callback: Callable[[str], None] | None = None,
+               buffer_interval: float = 0) -> tuple[str, dict]:
+    """流式调用 LLM，实时或间隔输出 token。
 
     Args:
         llm: ChatOllama 实例。
         prompt_text: 完整的 prompt 文本（含 <|im_start|> 等标记）。
         label: 输出前缀标签，如 "[Thinker] "。
         live_callback: 可选回调，每收到 token 时调用。用于 Rich Live 渲染。
+        buffer_interval: 间隔秒数，>0 时每 N 秒批量 flush 到 stdout（降低 patch_stdout 压力）。
 
     Returns:
         (full_text, usage_dict): 累积的完整响应文本和 token 用量信息。
     """
     full_text = ""
     usage = {}
+    last_flush_pos = 0
+    last_flush_time = time.time()
 
     for chunk in llm.stream([HumanMessage(content=prompt_text)]):
         token = ""
@@ -33,11 +38,6 @@ def stream_llm(llm, prompt_text: str, label: str = "",
 
         if token:
             full_text += token
-            if live_callback:
-                live_callback(full_text)
-            else:
-                sys.stdout.write(token)
-                sys.stdout.flush()
 
         if not usage and hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
             raw = dict(chunk.usage_metadata)
@@ -47,7 +47,26 @@ def stream_llm(llm, prompt_text: str, label: str = "",
                 "total": raw.get("total_tokens", 0),
             }
 
-    if not live_callback:
+        if buffer_interval > 0 and not live_callback:
+            now = time.time()
+            if now - last_flush_time >= buffer_interval:
+                new_text = full_text[last_flush_pos:]
+                if new_text:
+                    sys.stdout.write(new_text + "\n")
+                    sys.stdout.flush()
+                last_flush_pos = len(full_text)
+                last_flush_time = now
+        elif token and not live_callback:
+            sys.stdout.write(token)
+            sys.stdout.flush()
+
+    if buffer_interval > 0 and not live_callback:
+        new_text = full_text[last_flush_pos:]
+        if new_text:
+            sys.stdout.write(new_text)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+    elif not live_callback:
         sys.stdout.write("\n")
         sys.stdout.flush()
 

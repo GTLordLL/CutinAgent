@@ -1,3 +1,4 @@
+import sys
 import time
 from parsers.tool_call import _build_tool_signature, _split_parallel_calls
 from validator.SopExecutionSchedulerValidator import validate_tool_call, validate_scheduler_output
@@ -62,8 +63,10 @@ def sop_execution_scheduler_node(resources):
             f"<|im_start|>assistant\n"
         )
 
+        sys.stdout.write("\033[2m")
+        sys.stdout.flush()
         print("  [Scheduler Thinker] ", end="", flush=True)
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw)
+        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0)
 
         # --- Formatter with retries ---
         max_retries = 3
@@ -87,7 +90,7 @@ def sop_execution_scheduler_node(resources):
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
             print(f"  [Scheduler Formatter{retry_label}] ", end="", flush=True)
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt)
+            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0)
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
 
@@ -120,6 +123,9 @@ def sop_execution_scheduler_node(resources):
                 f"<|im_start|>user\n格式输出错误，原因：{error_reason}<|im_end|>\n"
                 f"<|im_start|>assistant\n"
             )
+
+        sys.stdout.write("\033[0m\n")
+        sys.stdout.flush()
 
         result = {
             "current_tool_call": tool_id,
