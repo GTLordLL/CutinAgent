@@ -118,6 +118,7 @@ async def run_repl():
     status_control = FormattedTextControl(_get_status)
 
     root = HSplit([
+        Window(height=1, char=" "),
         Window(height=1, char="─"),
         input_field,
         Window(height=1, char="─"),

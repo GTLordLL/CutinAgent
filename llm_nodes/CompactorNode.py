@@ -1,5 +1,5 @@
-import sys
 import time
+from rich.console import Console
 from validator.CompactorValidator import validate_compactor_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
@@ -17,6 +17,7 @@ def compactor_node(resources):
     formatter_llm = resources.get_llm("all_formatter")
     thinker_prompt = resources.prompts["compactor_thinker"]
     formatter_prompt = resources.prompts["compactor_formatter"]
+    _console = Console()
 
     def compact(state: dict) -> dict:
         t_start = time.time()
@@ -58,10 +59,8 @@ def compactor_node(resources):
             f"<|im_start|>assistant\n"
         )
 
-        sys.stdout.write("\033[2m")
-        sys.stdout.flush()
-        print("  [Thinker] ", end="", flush=True)
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0)
+        _console.out("  [Thinker] ", style="dim", end="")
+        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0, console=_console, style="dim")
 
         # --- Formatter with retries ---
         max_retries = 3
@@ -79,8 +78,8 @@ def compactor_node(resources):
 
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
-            print(f"  [Formatter{retry_label}] ", end="", flush=True)
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0)
+            _console.out(f"  [Formatter{retry_label}] ", style="dim", end="")
+            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0, console=_console, style="dim")
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
 
@@ -102,9 +101,6 @@ def compactor_node(resources):
                 f"<|im_start|>user\n格式输出错误，原因：{error_reason}<|im_end|>\n"
                 f"<|im_start|>assistant\n"
             )
-
-        sys.stdout.write("\033[0m\n")
-        sys.stdout.flush()
 
         # --- Fallback if all retries exhausted ---
         if not parsed:

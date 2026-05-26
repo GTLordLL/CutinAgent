@@ -1,5 +1,5 @@
-import sys
 import time
+from rich.console import Console
 from validator.UserCoordinatorValidator import validate_coordinator_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
@@ -20,6 +20,7 @@ def user_coordinator_node(resources):
     formatter_prompt = resources.prompts["user_coordinator_formatter"]
     sops_df = resources.sops_df
     valid_sop_ids = set(sops_df["SOP_ID"].tolist())
+    _console = Console()
 
     def coordinator(state: dict) -> dict:
         t_start = time.time()
@@ -45,10 +46,8 @@ def user_coordinator_node(resources):
             f"<|im_start|>assistant\n"
         )
 
-        sys.stdout.write("\033[2m")
-        sys.stdout.flush()
-        print("  [Thinker] ", end="", flush=True)
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0)
+        _console.out("  [Thinker] ", style="dim", end="")
+        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0, console=_console, style="dim")
 
         # --- Formatter with retries ---
         max_retries = 3
@@ -66,8 +65,8 @@ def user_coordinator_node(resources):
 
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
-            print(f"  [Formatter{retry_label}] ", end="", flush=True)
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0)
+            _console.out(f"  [Formatter{retry_label}] ", style="dim", end="")
+            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0, console=_console, style="dim")
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
 
@@ -89,9 +88,6 @@ def user_coordinator_node(resources):
                 f"<|im_start|>user\n格式输出错误，原因：{error_reason}<|im_end|>\n"
                 f"<|im_start|>assistant\n"
             )
-
-        sys.stdout.write("\033[0m\n")
-        sys.stdout.flush()
 
         # --- Fallback if all retries exhausted ---
         if not parsed:
