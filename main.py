@@ -2,21 +2,12 @@ import asyncio
 import time
 from datetime import datetime
 
-from prompt_toolkit import Application
-from prompt_toolkit.layout import Layout, HSplit, Window
-from prompt_toolkit.layout.controls import FormattedTextControl
-from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.filters import has_focus
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.markdown import Markdown
-from rich.text import Text
-from rich import box
 
 from graph.Builder import build_graph
 from utils.LLMResources import initialize_resources
@@ -31,42 +22,19 @@ from repl import (
     reset_sop_state,
     run_sop_graph,
     write_run_summary,
+    ReplCompleter,
+    print_welcome,
+    print_user_message,
+    print_agent_message,
+    print_command_result,
+    create_input_field,
+    create_status_bar,
+    create_root_container,
+    create_layout,
+    build_application,
 )
 
 console = Console()
-
-_REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/exit", "/quit"]
-
-
-class ReplCompleter(Completer):
-    """Tab 补全 / 前缀命令。"""
-    def get_completions(self, document, complete_event):
-        text = document.text_before_cursor
-        if text.startswith("/"):
-            for cmd in _REPL_COMMANDS:
-                if cmd.startswith(text):
-                    yield Completion(cmd, start_position=-len(text))
-
-
-def _print_welcome():
-    console.print(Panel(
-        Text("CutinAgent REPL — 人机协作模式\n/help 查看命令  /exit 退出",
-             style="bold", justify="center"),
-        box=box.HEAVY, padding=(1, 2),
-    ))
-
-
-def _print_user_message(text: str):
-    console.print()
-    console.print(Text("▌", style="bold"), Panel(text, box=box.SQUARE, padding=(0, 1)))
-
-
-def _print_agent_message(text: str):
-    console.print(Markdown(text))
-
-
-def _print_command_result(text: str):
-    console.print(Markdown(text))
 
 
 async def run_repl():
@@ -97,34 +65,15 @@ async def run_repl():
 
     # 6. 欢迎界面
     console.print()
-    _print_welcome()
+    print_welcome(console)
 
     # ── Application 组件 ────────────────────────────────────────
 
-    input_field = TextArea(
-        text="",
-        multiline=False,
-        prompt="> ",
-        history=InMemoryHistory(),
-        completer=ReplCompleter(),
-        style="class:input",
-    )
+    input_field = create_input_field(completer=ReplCompleter())
+    status_control, status_data = create_status_bar()
 
-    status_data = {"text": "CutinAgent REPL — /help 查看命令"}
-
-    def _get_status():
-        return status_data["text"]
-
-    status_control = FormattedTextControl(_get_status)
-
-    root = HSplit([
-        Window(height=1, char=" "),
-        Window(height=1, char="─"),
-        input_field,
-        Window(height=1, char="─"),
-        Window(content=status_control, height=1, style="class:status"),
-    ])
-    layout = Layout(root, focused_element=input_field)
+    root = create_root_container(input_field, status_control)
+    layout = create_layout(root, input_field)
 
     # 确认流程状态
     confirm_event = asyncio.Event()
@@ -162,12 +111,7 @@ async def run_repl():
     def _on_escape(event):
         input_field.buffer.text = ""
 
-    app = Application(
-        layout=layout,
-        key_bindings=kb,
-        full_screen=False,
-        erase_when_done=True,
-    )
+    app = build_application(layout, kb)
 
     # ── 输入处理逻辑 ────────────────────────────────────────────
 
@@ -186,13 +130,13 @@ async def run_repl():
                     app.exit(result="exit")
                     return
                 if handled:
-                    _print_command_result(msg)
+                    print_command_result(console, msg)
                     return
 
                 # 追加到当前对话
                 state["current_dialogue"] += f"User: {user_msg}\n"
                 state["user_instruction"] = user_msg
-                _print_user_message(user_msg)
+                print_user_message(console, user_msg)
 
                 # ---- Step 1: UserCoordinator ----
                 _set_status("分析中...")
@@ -202,10 +146,11 @@ async def run_repl():
                 coord_result = await loop.run_in_executor(
                     None, user_coordinator_fn, state
                 )
+                await asyncio.sleep(0.3)
                 state.update(coord_result)
 
                 console.print()
-                _print_agent_message(state["chat_message"])
+                print_agent_message(console, state["chat_message"])
                 state["current_dialogue"] += f"Agent: {state['chat_message']}\n"
                 _set_status(state.get("matched_sop_id", ""))
 
@@ -284,6 +229,7 @@ async def run_repl():
                                 None, run_sop_graph, app_graph, state, console
                             )
                         )
+                        await asyncio.sleep(0.3)
                     except Exception as e:
                         console.print(f"[bold red]SOP 执行崩溃: {e}[/bold red]")
                         import traceback
@@ -307,6 +253,7 @@ async def run_repl():
                     compactor_result = await loop.run_in_executor(
                         None, compactor_fn, state
                     )
+                    await asyncio.sleep(0.3)
                     state.update(compactor_result)
 
                     console.print()

@@ -34,10 +34,13 @@ def stream_llm(llm, prompt_text: str, label: str = "",
     full_text = ""
     usage = {}
     last_flush_pos = 0
-    last_flush_time = time.time()
+    last_flush_time = None  # 收到第一个 token 才计时，避免首 token 延迟被误 flush
 
     def _write(text: str):
-        """写入 stdout，优先使用 Rich Console 样式输出。"""
+        """写入 stdout，优先使用 Rich Console 样式输出。
+        每次 flush 的文本末尾必须带 \\n，否则 patch_stdout 的 run_in_terminal
+        渲染后光标不换行，下一次输出会覆盖当前行。
+        """
         if console and style:
             console.out(text, style=style, end="")
             console.file.flush()
@@ -62,20 +65,22 @@ def stream_llm(llm, prompt_text: str, label: str = "",
             }
 
         if buffer_interval > 0 and not live_callback:
+            if last_flush_time is None:
+                last_flush_time = time.time()
             now = time.time()
             if now - last_flush_time >= buffer_interval:
                 new_text = full_text[last_flush_pos:]
                 if new_text:
-                    _write(new_text)
+                    _write(new_text + "\n")
                 last_flush_pos = len(full_text)
                 last_flush_time = now
         elif token and not live_callback:
             _write(token)
 
     if buffer_interval > 0 and not live_callback:
-        new_text = full_text[last_flush_pos:]
-        if new_text:
-            _write(new_text)
+        remaining = full_text[last_flush_pos:]
+        _write(remaining + "\n")
+        time.sleep(0.3)
     elif not live_callback:
         _write("\n")
 

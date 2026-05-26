@@ -1,3 +1,18 @@
+from prompt_toolkit.completion import Completer, Completion
+
+REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/exit", "/quit"]
+
+
+class ReplCompleter(Completer):
+    """Tab 补全 / 前缀命令。"""
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        if text.startswith("/"):
+            for cmd in REPL_COMMANDS:
+                if cmd.startswith(text):
+                    yield Completion(cmd, start_position=-len(text))
+
+
 def build_help_message(resources) -> str:
     """构建 /help 信息（Markdown 格式）。"""
     lines = [

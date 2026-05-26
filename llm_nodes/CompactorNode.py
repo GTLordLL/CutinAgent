@@ -59,7 +59,7 @@ def compactor_node(resources):
             f"<|im_start|>assistant\n"
         )
 
-        _console.out("  [Thinker] ", style="dim", end="")
+        _console.out("  [Thinker] ", style="dim")
         reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0, console=_console, style="dim")
 
         # --- Formatter with retries ---
@@ -78,7 +78,7 @@ def compactor_node(resources):
 
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
-            _console.out(f"  [Formatter{retry_label}] ", style="dim", end="")
+            _console.out(f"  [Formatter{retry_label}] ", style="dim")
             raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0, console=_console, style="dim")
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
