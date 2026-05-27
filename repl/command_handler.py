@@ -56,7 +56,7 @@ def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
     name = parts[0].lower()
 
     if name in ("/exit", "/quit"):
-        return True, "再见！", True
+        return True, "", True
 
     if name == "/help":
         return True, build_help_message(resources), False

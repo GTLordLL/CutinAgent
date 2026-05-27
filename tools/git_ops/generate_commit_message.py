@@ -36,7 +36,7 @@ def generate_commit_message(data: str) -> dict:
         )
 
         print("  [generate_commit_message] ", end="", flush=True)
-        message, _ = stream_llm(llm, prompt)
+        message, _ = stream_llm(llm, prompt, buffer_interval=2.0)
         message = message.strip()
 
         return {

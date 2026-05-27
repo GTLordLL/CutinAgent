@@ -36,7 +36,7 @@ def generate_daily_report(data: str) -> dict:
         )
 
         print("  [generate_daily_report] ", end="", flush=True)
-        report, _ = stream_llm(llm, prompt)
+        report, _ = stream_llm(llm, prompt, buffer_interval=2.0)
         report = report.strip()
 
         return {

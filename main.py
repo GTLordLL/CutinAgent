@@ -126,7 +126,6 @@ async def run_repl():
                     user_msg, state, resources
                 )
                 if should_exit:
-                    console.print(f"[bold]{msg}[/bold]")
                     app.exit(result="exit")
                     return
                 if handled:
@@ -140,7 +139,7 @@ async def run_repl():
 
                 # ---- Step 1: UserCoordinator ----
                 _set_status("分析中...")
-                console.print(Panel("[UserCoordinator] 分析中...", padding=(0, 1)))
+                console.print("[dim][UserCoordinator] 分析中...[/dim]")
 
                 loop = asyncio.get_running_loop()
                 coord_result = await loop.run_in_executor(

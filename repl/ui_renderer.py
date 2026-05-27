@@ -20,11 +20,12 @@ def print_welcome(console: Console):
 
 def print_user_message(console: Console, text: str):
     console.print()
-    console.print(Text("▌", style="bold"), Panel(text, box=box.SQUARE, padding=(0, 1)))
+    console.print(Text(f"> {text}", style="bold white on bright_black"))
+    console.print()
 
 
 def print_agent_message(console: Console, text: str):
-    console.print(Markdown(text))
+    console.print(Text(text))
 
 
 def print_command_result(console: Console, text: str):

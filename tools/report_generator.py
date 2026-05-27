@@ -33,7 +33,7 @@ def generate_summary_report(data: str) -> str:
         )
 
         print("  [report_generator] ", end="", flush=True)
-        report, _ = stream_llm(llm, prompt)
+        report, _ = stream_llm(llm, prompt, buffer_interval=2.0)
         report = str(report)
 
         return (

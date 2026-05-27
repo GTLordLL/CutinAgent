@@ -27,7 +27,7 @@ from rich import box
 
 # ── 命令补全 ──────────────────────────────────────────────────
 
-_REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/exit", "/quit"]
+_REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/styles", "/exit", "/quit"]
 
 class ReplCompleter(Completer):
     def get_completions(self, document, complete_event):
@@ -147,6 +147,89 @@ def print_status_bar(sop_name: str, round_num: int, tokens: int):
     bar.append(right)
     console.print(bar)
 
+def print_styles_demo():
+    """展示 Rich 所有常用样式。"""
+    # ── 文字样式 ──
+    console.print()
+    console.print(Panel("Rich 常用样式一览", style="bold", box=box.HEAVY, padding=(0, 2)))
+
+    text_styles = [
+        ("bold", "bold"),
+        ("dim", "dim"),
+        ("italic", "italic"),
+        ("underline", "underline"),
+        ("strike", "strike"),
+        ("reverse", "reverse"),
+        ("blink", "blink"),
+    ]
+    for name, style in text_styles:
+        console.print(Text(f"  {name:<12} → ", style="default"), Text(f"The quick brown fox jumps over the lazy dog", style=style))
+
+    console.print()
+
+    # ── 前景色 ──
+    fg_colors = [
+        "red", "green", "blue", "yellow", "magenta", "cyan", "white", "black",
+        "bright_red", "bright_green", "bright_blue", "bright_yellow",
+        "bright_magenta", "bright_cyan", "bright_white", "bright_black",
+    ]
+    console.print("[bold]前景色 (color)[/bold]")
+    for c in fg_colors:
+        console.print(Text(f"  {c:<16} → ", style="default"), Text("The quick brown fox jumps over the lazy dog", style=c))
+    console.print()
+
+    # ── 背景色 ──
+    bg_colors = [
+        "on_red", "on_green", "on_blue", "on_yellow", "on_magenta", "on_cyan",
+        "on_bright_red", "on_bright_green", "on_bright_blue", "on_bright_yellow",
+        "on_bright_magenta", "on_bright_cyan",
+    ]
+    console.print("[bold]背景色 (on_color)[/bold]")
+    for c in bg_colors:
+        console.print(f"  {c:<20} → [{c}]  The quick brown fox  [/]")
+    console.print()
+
+    # ── 组合样式 ──
+    console.print("[bold]组合样式[/bold]")
+    combos = [
+        "bold red", "italic green", "underline blue",
+        "bold underline yellow", "dim italic",
+        "reverse bold cyan", "strike bright_red",
+    ]
+    for c in combos:
+        console.print(Text(f"  {c:<32} → ", style="default"), Text("The quick brown fox", style=c))
+    # 含背景色的用 markup
+    bg_combos = [
+        ("bold on_green", "bold on_green"),
+        ("white on_blue", "white on_blue"),
+        ("bright_yellow on_magenta", "bright_yellow on_magenta"),
+        ("underline bright_cyan on_bright_black", "underline bright_cyan on_bright_black"),
+    ]
+    for c, _ in bg_combos:
+        console.print(f"  {c:<32} → [{c}]The quick brown fox[/]")
+    console.print()
+
+    # ── Markdown 内联样式 ──
+    console.print("[bold]Rich Markdown 内联样式[/bold]")
+    md_table = Table(box=box.SQUARE, padding=(0, 1))
+    md_table.add_column("Markup", style="dim")
+    md_table.add_column("效果")
+    examples = [
+        ("[bold]bold[/bold]", "[bold]bold text[/bold]"),
+        ("[dim]dim[/dim]", "[dim]dim text[/dim]"),
+        ("[italic]italic[/italic]", "[italic]italic text[/italic]"),
+        ("[underline]underline[/underline]", "[underline]underline text[/underline]"),
+        ("[strike]strike[/strike]", "[strike]strike text[/strike]"),
+        ("[reverse]reverse[/reverse]", "[reverse]reverse text[/reverse]"),
+        ("[red]red[/red]", "[red]red text[/red]"),
+        ("[bold red]bold red[/bold red]", "[bold red]bold red text[/bold red]"),
+        ("[on_blue]on_blue[/on_blue]", "[on_blue]blue background[/on_blue]"),
+        ("[link=https://example.com]link[/link]", "[link=https://example.com]clickable link[/link]"),
+    ]
+    for markup, effect in examples:
+        md_table.add_row(markup, effect)
+    console.print(md_table)
+
 # ── 模拟流式输出 ──────────────────────────────────────────────
 
 def simulate_stream(text: str, delay: float = 0.02):
@@ -183,7 +266,8 @@ def handle_command(cmd: str) -> tuple[bool, str | None]:
             "| `/sops` | 列出所有可用 SOP |",
             "| `/history` | 显示当前对话与执行历史 |",
             "| `/clear` | 清除对话历史 |",
-            "| `/exit` | 退出 REPL |",
+            "| `/styles` | 展示 Rich 所有常用样式 |",
+            "| `/exit` | 退出 REPL |"
             "",
             "直接输入消息可与 Agent 对话。",
         ])
@@ -199,6 +283,9 @@ def handle_command(cmd: str) -> tuple[bool, str | None]:
     if cmd == "/history":
         msg = "> 当前对话为空（Demo 模式）"
         return True, msg
+    if cmd == "/styles":
+        print_styles_demo()
+        return True, None
     if cmd == "/clear":
         return True, "对话历史已清除。"
     return False, None

@@ -1,5 +1,14 @@
 # CutinAgent REPL UI 设计文档
 
+终端里有三套样式各管一部分：
+
+- Rich — 负责上方内容区域：dim 灰色流式输出、Panel 边框、Markdown 渲染、Text 样式
+- prompt_toolkit — 负责底部固定区域的布局和样式：TextArea 输入框、FormattedTextControl
+状态栏、Window(char="─") 分隔线
+- ANSI 控制码 — patch_stdout 的 run_in_terminal 底层用来保存/恢复光标位置，这个是裸终端转义序列，不属于 Rich
+
+简单说：上半屏是 Rich 的，下半屏（固定栏）是 prompt_toolkit 的。
+
 ## 1. 流式输出方案
 
 | 方案 | 描述 | 状态 |
