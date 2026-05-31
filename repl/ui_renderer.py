@@ -11,11 +11,31 @@ from rich import box
 
 
 def print_welcome(console: Console):
-    console.print(Panel(
-        Text("CutinAgent REPL — 人机协作模式\n/help 查看命令  /exit 退出",
-             style="bold", justify="center"),
-        box=box.HEAVY, padding=(1, 2),
+    import os
+    cwd = os.getcwd()
+
+    sep = "=" * 65
+
+    banner = (
+        "     ______         __   _          ___                      __  \n"
+        "    / ____/_  __ __/ /_ (_)___     /   | ____  ___  ____  __/ /_ \n"
+        "   / /   / / / /_   __// / __ \\   / /| |/ __ `/ _ \\/ __ \\/_  __/ \n"
+        "  / /___/ /_/ / / /_  / / / / /  / ___ / /_/ /  __/ / / / / /    \n"
+        "  \\____/\\__,_/  |___//_/_/ /_/  /_/  |_\\__, /\\___/_/ /_/ /_/     \n"
+        "                                      /____/                     \n"
+        "  https://github.com/GTLordLL/CutinAgent  --  千务小切 v2.0.0     \n"
+    )
+
+    print(sep)
+    print(banner)
+
+    console.print(Text.assemble(
+        ("  当前目录：", "dim"),
+        (f"{cwd}\n", "white"),
+        ("  /help 查看命令  /exit 退出", "dim italic"),
     ))
+
+    print(sep)
 
 
 def print_user_message(console: Console, text: str):
@@ -25,7 +45,7 @@ def print_user_message(console: Console, text: str):
 
 
 def print_agent_message(console: Console, text: str):
-    console.print(Text(text))
+    console.out(text + "\n")
 
 
 def print_command_result(console: Console, text: str):

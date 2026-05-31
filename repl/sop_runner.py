@@ -58,8 +58,11 @@ def run_sop_graph(app, state: dict, console: Console | None = None) -> tuple[dic
                     else:
                         detail_lines.append(f"计划: {plan_display}")
 
-                subtitle = f"[dim]{node_name}[/dim]  [dim italic]{duration:.2f}s[/dim italic]"
-                body = Text("\n".join(detail_lines) if detail_lines else "(无输出)", style="dim")
+                if node_name == "progress_updater":
+                    subtitle = node_name
+                else:
+                    subtitle = f"{node_name}  [italic]{duration:.2f}s[/italic]"
+                body = Text("\n".join(detail_lines) if detail_lines else "(无输出)", style="")
                 c.print(Panel(body, title=subtitle, title_align="left", padding=(0, 1)))
 
                 log_state_snapshot(output, state.get("session_dir", ""), node_name, active_round)
