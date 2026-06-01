@@ -15,7 +15,8 @@ from utils.LLMResources import initialize_resources
 from utils.sop_loader import load_sop_markdown
 from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
-from llm_nodes.CompactorNode import compactor_node
+from llm_nodes.TaskCompactorNode import task_compactor_node
+from llm_nodes.ChatCompactorNode import chat_compactor_node
 from data_nodes.VariableStore import clear as clear_variables
 from repl import (
     create_initial_state,
@@ -53,9 +54,10 @@ async def run_repl():
     # 2. 编译 SOP 执行图（3 节点内循环）
     app_graph = build_graph(resources)
 
-    # 3. 创建 UserCoordinator 和 Compactor 可调用对象
+    # 3. 创建 UserCoordinator、TaskCompactor 和 ChatCompactor 可调用对象
     user_coordinator_fn = user_coordinator_node(resources)
-    compactor_fn = compactor_node(resources)
+    task_compactor_fn = task_compactor_node(resources)
+    chat_compactor_fn = chat_compactor_node(resources)
 
     # 4. 创建会话目录
     session_dir = create_session_dir()
@@ -133,20 +135,82 @@ async def run_repl():
                     app.exit(result="exit")
                     return
                 if handled:
-                    print_command_result(console, msg)
-                    # /clear 后重置 token 显示
-                    if user_msg.strip().lower() == "/clear":
-                        state["thinker_input_tokens"] = 0
-                        status_data["token_info"] = "0 (0.0%) tokens  ".rjust(
-                            shutil.get_terminal_size().columns
-                        )
-                        app.invalidate()
+                    # /compact 需要调用 LLM 压缩对话
+                    if user_msg.strip().lower().startswith("/compact"):
+                        if not state.get("current_dialogue", "").strip():
+                            console.print("[dim]没有需要压缩的对话内容。[/dim]")
+                        else:
+                            console.print("[dim][ChatCompactor] 压缩对话上下文...[/dim]")
+                            loop = asyncio.get_running_loop()
+                            cc_start = time.time()
+                            cc_stop = asyncio.Event()
+                            cc_timer = asyncio.create_task(
+                                _runtime_timer("ChatCompactor", cc_start, cc_stop)
+                            )
+                            try:
+                                cc_result = await loop.run_in_executor(
+                                    None, chat_compactor_fn, state
+                                )
+                            finally:
+                                cc_stop.set()
+                                await cc_timer
+                                top_status_data["runtime_text"] = ""
+                                app.invalidate()
+                            cc_elapsed = time.time() - cc_start
+                            console.print(f"[dim]ChatCompactor 耗时: {_fmt_elapsed(cc_elapsed)}[/dim]")
+                            state.update(cc_result)
+                            summary = state.get("chat_conversation_summary", "")
+                            if summary:
+                                state["conversation_history"] += "\n" + summary
+                                state["current_dialogue"] = ""
+                                console.print(Panel(
+                                    summary,
+                                    title="对话压缩结果", title_align="left", padding=(0, 1),
+                                ))
+                            else:
+                                console.print("[dim]对话压缩完成（无新摘要）。[/dim]")
+                    else:
+                        print_command_result(console, msg)
+                        # /clear 后重置 token 显示
+                        if user_msg.strip().lower() == "/clear":
+                            state["thinker_input_tokens"] = 0
+                            status_data["token_info"] = "0 (0.0%) tokens  ".rjust(
+                                shutil.get_terminal_size().columns
+                            )
+                            app.invalidate()
                     return
 
                 # 追加到当前对话
                 state["current_dialogue"] += f"User: {user_msg}\n"
                 state["user_instruction"] = user_msg
                 print_user_message(console, user_msg)
+
+                # 自动压缩：上一轮 Thinker 输入超过 4096 tokens
+                if state.get("thinker_input_tokens", 0) > 4096 and state.get("current_dialogue", "").strip():
+                    console.print(f"[dim][ChatCompactor] 上下文过长({state['thinker_input_tokens']} tokens)，自动压缩...[/dim]")
+                    state["chat_compact_requirement"] = ""
+                    loop = asyncio.get_running_loop()
+                    cc_start = time.time()
+                    cc_stop = asyncio.Event()
+                    cc_timer = asyncio.create_task(
+                        _runtime_timer("ChatCompactor", cc_start, cc_stop)
+                    )
+                    try:
+                        cc_result = await loop.run_in_executor(
+                            None, chat_compactor_fn, state
+                        )
+                    finally:
+                        cc_stop.set()
+                        await cc_timer
+                        top_status_data["runtime_text"] = ""
+                        app.invalidate()
+                    cc_elapsed = time.time() - cc_start
+                    console.print(f"[dim]ChatCompactor 耗时: {_fmt_elapsed(cc_elapsed)}[/dim]")
+                    state.update(cc_result)
+                    summary = state.get("chat_conversation_summary", "")
+                    if summary:
+                        state["conversation_history"] += "\n" + summary
+                        state["current_dialogue"] = ""
 
                 # ---- Step 1: UserCoordinator ----
                 _set_status("分析中...")
@@ -288,21 +352,21 @@ async def run_repl():
                     ))
                     _set_status(f"完成: {state['matched_sop_id']}")
 
-                    # ---- Step 4: Compactor ----
-                    console.print("[dim][Compactor] 评价与总结中...[/dim]")
+                    # ---- Step 4: TaskCompactor ----
+                    console.print("[dim][TaskCompactor] 评价与总结中...[/dim]")
                     compactor_result = await loop.run_in_executor(
-                        None, compactor_fn, state
+                        None, task_compactor_fn, state
                     )
                     await asyncio.sleep(0.3)
                     state.update(compactor_result)
 
-                    # 计时结束（SOP + Compactor 总耗时）
+                    # 计时结束（SOP + TaskCompactor 总耗时）
                     total_elapsed = time.time() - sop_start
                     sop_stop.set()
                     await sop_timer
                     top_status_data["runtime_text"] = ""
                     app.invalidate()
-                    console.print(f"[dim]总耗时 (SOP + Compactor): {_fmt_elapsed(total_elapsed)}[/dim]")
+                    console.print(f"[dim]总耗时 (SOP + TaskCompactor): {_fmt_elapsed(total_elapsed)}[/dim]")
 
                     console.print()
                     console.print(Panel(

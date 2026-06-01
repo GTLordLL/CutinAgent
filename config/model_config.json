@@ -17,6 +17,14 @@
             "num_predict": 4096,
             "repeat_penalty": 1.1
         },
+        "chat_compactor_thinker": {
+            "model_id": "qwen3:4b-instruct_q8_8k",
+            "temperature": 0.4,
+            "top_p": 0.9,
+            "top_k": 20,
+            "num_predict": 4096,
+            "repeat_penalty": 1.1
+        },
         "sop_execution_scheduler_thinker": {
             "model_id": "qwen3:4b-instruct_q8_8k",
             "temperature": 0.4,

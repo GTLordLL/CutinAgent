@@ -5,8 +5,8 @@ from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
 
 
-def compactor_node(resources):
-    """Compactor 可调用对象工厂。
+def task_compactor_node(resources):
+    """TaskCompactor 可调用对象工厂。
 
     返回一个函数，接收 state dict，执行 Thinker+Formatter 双阶段推理，
     返回 state 更新 dict。
@@ -19,7 +19,7 @@ def compactor_node(resources):
     formatter_prompt = resources.prompts["compactor_formatter"]
     _console = Console()
 
-    def compact(state: dict) -> dict:
+    def compact_task(state: dict) -> dict:
         t_start = time.time()
         round_num = state.get("current_round", 0)
 
@@ -117,7 +117,7 @@ def compactor_node(resources):
         }
 
         log_node_io(
-            node_name="Compactor",
+            node_name="TaskCompactor",
             round_num=round_num,
             thinker_input=thinker_input,
             reasoning_chain=reasoning_chain,
@@ -130,4 +130,4 @@ def compactor_node(resources):
 
         return result
 
-    return compact
+    return compact_task

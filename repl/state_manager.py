@@ -41,6 +41,10 @@ def create_initial_state(user_query: str, session_dir: str,
         "compactor_evaluation": "",
         "compactor_conversation_summary": "",
         "compactor_execution_summary": "",
+        # ChatCompactor
+        "thinker_input_tokens": 0,
+        "chat_compact_requirement": "",
+        "chat_conversation_summary": "",
     }
 
 

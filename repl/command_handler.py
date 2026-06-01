@@ -1,6 +1,6 @@
 from prompt_toolkit.completion import Completer, Completion
 
-REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/exit", "/quit"]
+REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/exit", "/quit"]
 
 
 class ReplCompleter(Completer):
@@ -22,7 +22,8 @@ def build_help_message(resources) -> str:
         "|------|------|",
         "| `/help` | 显示此帮助信息 |",
         "| `/sops` | 列出所有可用 SOP |",
-        "| `/history` | 显示当前对话与执行历史摘要 |",
+        "| `/history` | 显示当前对话与执行历史摘要 |\n"
+        "| `/compact [提示]` | 手动压缩对话上下文，可附带压缩要求 |",
         "| `/clear` | 清除对话历史 |",
         "| `/exit` | 退出 REPL |",
         "",
@@ -75,6 +76,11 @@ def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
 
     if name == "/history":
         return True, build_history_message(state), False
+
+    if name == "/compact":
+        requirement = " ".join(parts[1:]) if len(parts) > 1 else ""
+        state["chat_compact_requirement"] = requirement
+        return True, "正在压缩对话上下文...", False
 
     # 未知 / 命令 — 交给 UserCoordinator 当作普通消息
     return False, None, False

@@ -58,6 +58,8 @@ def initialize_resources() -> LLMResources:
         "user_coordinator_formatter": load_prompt_file("./prompts/user_coordinator/formatter.md"),
         "compactor_thinker": load_prompt_file("./prompts/compactor/thinker.md"),
         "compactor_formatter": load_prompt_file("./prompts/compactor/formatter.md"),
+        "chat_compactor_thinker": load_prompt_file("./prompts/chat_compactor/thinker.md"),
+        "chat_compactor_formatter": load_prompt_file("./prompts/chat_compactor/formatter.md"),
         "sop_execution_scheduler_thinker": load_prompt_file("./prompts/sop_execution_scheduler/thinker.md"),
         "sop_execution_scheduler_formatter": load_prompt_file("./prompts/sop_execution_scheduler/formatter.md"),
     }

@@ -51,3 +51,7 @@ class OverallState(TypedDict):
     compactor_evaluation: str       # Compactor 对此次执行的评价
     compactor_conversation_summary: str  # Compactor 输出的对话摘要
     compactor_execution_summary: str     # Compactor 输出的执行摘要
+    # === ChatCompactor ===
+    thinker_input_tokens: int           # UserCoordinator Thinker 输入 token 数（用于自动压缩阈值判断）
+    chat_compact_requirement: str       # /compact 携带的用户压缩要求
+    chat_conversation_summary: str      # ChatCompactor 输出的对话摘要
