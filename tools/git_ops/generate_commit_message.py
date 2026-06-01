@@ -36,7 +36,7 @@ def generate_commit_message(data: str) -> dict:
         )
 
         print("  [generate_commit_message] ", end="", flush=True)
-        message, _ = stream_llm(llm, prompt, buffer_interval=2.0)
+        message, usage = stream_llm(llm, prompt, buffer_interval=2.0)
         message = message.strip()
 
         return {
@@ -44,6 +44,7 @@ def generate_commit_message(data: str) -> dict:
             "conclusion": "已生成 Commit Message",
             "summary": message,
             "detail": message,
+            "token_usage": usage,
         }
 
     except Exception as e:

@@ -24,6 +24,8 @@ def _save_tool_output(fields: dict, session_dir: str, round_num: int,
     }
     if elapsed_ms > 0:
         record["elapsed_ms"] = round(elapsed_ms, 1)
+    if fields.get("token_usage"):
+        record["token_usage"] = fields["token_usage"]
 
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(record, f, ensure_ascii=False, indent=2)

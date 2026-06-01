@@ -10,6 +10,7 @@ from repl.ui_renderer import (
 )
 from repl.app_builder import (
     create_input_field,
+    create_top_status_bar,
     create_status_bar,
     create_root_container,
     create_layout,
@@ -30,6 +31,7 @@ __all__ = [
     "print_agent_message",
     "print_command_result",
     "create_input_field",
+    "create_top_status_bar",
     "create_status_bar",
     "create_root_container",
     "create_layout",

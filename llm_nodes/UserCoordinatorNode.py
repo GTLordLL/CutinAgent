@@ -105,6 +105,7 @@ def user_coordinator_node(resources):
             "current_action": parsed.get("current_action", ""),
             "long_term_intent": parsed.get("long_term_intent", ""),
             "is_execute": parsed.get("is_execute", "false"),
+            "thinker_input_tokens": thinker_tokens.get("input", 0) if thinker_tokens else 0,
         }
 
         log_node_io(

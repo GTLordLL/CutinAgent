@@ -33,14 +33,16 @@ def generate_summary_report(data: str) -> str:
         )
 
         print("  [report_generator] ", end="", flush=True)
-        report, _ = stream_llm(llm, prompt, buffer_interval=2.0)
-        report = str(report)
+        report, usage = stream_llm(llm, prompt, buffer_interval=2.0)
+        report = str(report).strip()
 
-        return (
-            f"成功 | 已经通过子代理生成了一份详细的总结报告\n"
-            f"[DETAIL]\n"
-            f"{report}"
-        )
+        return {
+            "status": "成功",
+            "conclusion": "已通过子代理生成总结报告",
+            "summary": report,
+            "detail": report,
+            "token_usage": usage,
+        }
 
     except Exception as e:
         return f"失败 | 生成报告时发生异常: {str(e)}"

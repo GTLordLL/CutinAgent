@@ -36,7 +36,7 @@ def generate_daily_report(data: str) -> dict:
         )
 
         print("  [generate_daily_report] ", end="", flush=True)
-        report, _ = stream_llm(llm, prompt, buffer_interval=2.0)
+        report, usage = stream_llm(llm, prompt, buffer_interval=2.0)
         report = report.strip()
 
         return {
@@ -44,6 +44,7 @@ def generate_daily_report(data: str) -> dict:
             "conclusion": "已生成今日变更日报",
             "summary": report,
             "detail": report,
+            "token_usage": usage,
         }
 
     except Exception as e:

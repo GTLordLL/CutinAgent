@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 import time
 from datetime import datetime
 
@@ -15,6 +16,7 @@ from utils.sop_loader import load_sop_markdown
 from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
 from llm_nodes.CompactorNode import compactor_node
+from data_nodes.VariableStore import clear as clear_variables
 from repl import (
     create_initial_state,
     create_session_dir,
@@ -28,6 +30,7 @@ from repl import (
     print_agent_message,
     print_command_result,
     create_input_field,
+    create_top_status_bar,
     create_status_bar,
     create_root_container,
     create_layout,
@@ -70,9 +73,10 @@ async def run_repl():
     # ── Application 组件 ────────────────────────────────────────
 
     input_field = create_input_field(completer=ReplCompleter())
+    top_status_control, top_status_data = create_top_status_bar()
     status_control, status_data = create_status_bar()
 
-    root = create_root_container(input_field, status_control)
+    root = create_root_container(input_field, top_status_control, top_status_data, status_control)
     layout = create_layout(root, input_field)
 
     # 确认流程状态
@@ -130,6 +134,13 @@ async def run_repl():
                     return
                 if handled:
                     print_command_result(console, msg)
+                    # /clear 后重置 token 显示
+                    if user_msg.strip().lower() == "/clear":
+                        state["thinker_input_tokens"] = 0
+                        status_data["token_info"] = "0 (0.0%) tokens  ".rjust(
+                            shutil.get_terminal_size().columns
+                        )
+                        app.invalidate()
                     return
 
                 # 追加到当前对话
@@ -142,11 +153,33 @@ async def run_repl():
                 console.print("[dim][UserCoordinator] 分析中...[/dim]")
 
                 loop = asyncio.get_running_loop()
-                coord_result = await loop.run_in_executor(
-                    None, user_coordinator_fn, state
+                coord_start = time.time()
+                coord_stop = asyncio.Event()
+                coord_timer = asyncio.create_task(
+                    _runtime_timer("UserCoordinator", coord_start, coord_stop)
                 )
+                try:
+                    coord_result = await loop.run_in_executor(
+                        None, user_coordinator_fn, state
+                    )
+                finally:
+                    coord_stop.set()
+                    await coord_timer
+                    top_status_data["runtime_text"] = ""
+                    app.invalidate()
+
+                coord_elapsed = time.time() - coord_start
+                console.print(f"[dim]UserCoordinator 耗时: {_fmt_elapsed(coord_elapsed)}[/dim]")
+
                 await asyncio.sleep(0.3)
                 state.update(coord_result)
+
+                # 更新 token 显示
+                input_tokens = state.get("thinker_input_tokens", 0)
+                ratio = (input_tokens / 8192) * 100
+                token_text = f"{input_tokens:,} ({ratio:.1f}%) tokens  "
+                status_data["token_info"] = token_text.rjust(shutil.get_terminal_size().columns)
+                app.invalidate()
 
                 console.print()
                 print_agent_message(console, state["chat_message"])
@@ -222,6 +255,10 @@ async def run_repl():
                     ))
 
                     sop_start = time.time()
+                    sop_stop = asyncio.Event()
+                    sop_timer = asyncio.create_task(
+                        _runtime_timer("SOP", sop_start, sop_stop)
+                    )
                     try:
                         state, node_timings, final_task_status, total_rounds = (
                             await loop.run_in_executor(
@@ -230,6 +267,10 @@ async def run_repl():
                         )
                         await asyncio.sleep(0.3)
                     except Exception as e:
+                        sop_stop.set()
+                        await sop_timer
+                        top_status_data["runtime_text"] = ""
+                        app.invalidate()
                         console.print(f"[bold red]SOP 执行崩溃: {e}[/bold red]")
                         import traceback
                         traceback.print_exc()
@@ -254,6 +295,14 @@ async def run_repl():
                     )
                     await asyncio.sleep(0.3)
                     state.update(compactor_result)
+
+                    # 计时结束（SOP + Compactor 总耗时）
+                    total_elapsed = time.time() - sop_start
+                    sop_stop.set()
+                    await sop_timer
+                    top_status_data["runtime_text"] = ""
+                    app.invalidate()
+                    console.print(f"[dim]总耗时 (SOP + Compactor): {_fmt_elapsed(total_elapsed)}[/dim]")
 
                     console.print()
                     console.print(Panel(
@@ -289,6 +338,8 @@ async def run_repl():
                         total_rounds=total_rounds,
                     )
 
+                clear_variables()
+
             except Exception:
                 import traceback
                 traceback.print_exc()
@@ -297,6 +348,28 @@ async def run_repl():
                 _set_status("")
 
     # ── 辅助函数 ────────────────────────────────────────────────
+
+    def _fmt_elapsed(seconds: float) -> str:
+        """格式化耗时：<60s 用 '12s'，>=60s 用 '1m15s'。"""
+        if seconds >= 60:
+            m = int(seconds // 60)
+            s = int(seconds % 60)
+            return f"{m}m{s}s"
+        return f"{seconds:.0f}s"
+
+    async def _runtime_timer(label: str, start_time: float, stop_event: asyncio.Event):
+        """后台定时器：每 0.5s 刷新顶部状态栏的实时耗时。"""
+        try:
+            while not stop_event.is_set():
+                elapsed = time.time() - start_time
+                top_status_data["runtime_text"] = f"  {label}: {_fmt_elapsed(elapsed)}"
+                app.invalidate()
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    pass
+        except asyncio.CancelledError:
+            pass
 
     def _set_status(text: str):
         status_data["text"] = (
