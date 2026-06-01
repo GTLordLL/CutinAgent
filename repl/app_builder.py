@@ -60,7 +60,9 @@ def create_status_bar(default_text: str = "CutinAgent REPL — /help 查看命�
 
 def create_root_container(input_field: TextArea, top_status_control: FormattedTextControl,
                          top_status_data: dict,
-                         bottom_status_control: FormattedTextControl) -> HSplit:
+                         bottom_status_control: FormattedTextControl,
+                         picker_control: FormattedTextControl = None,
+                         picker_filter=None) -> HSplit:
     """构建 HSplit 布局，顶部状态栏动态高度。
 
     布局结构（从上到下）：
@@ -68,9 +70,28 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
         顶部分隔线 (height=1, char="─")
         输入区域 (TextArea)
         底部分隔线 (height=1, char="─")
-        底部状态栏 (FormattedTextControl, height=2)
+        底部状态栏 (height=2) / 会话选择器 (height=8, picker 激活时覆盖)
     """
     has_runtime = Condition(lambda: bool(top_status_data.get("runtime_text", "")))
+
+    # 底部区域：正常状态栏与会话选择器条件切换
+    if picker_control is not None and picker_filter is not None:
+        bottom_elements = [
+            Window(height=1, char="─"),
+            ConditionalContainer(
+                content=Window(content=bottom_status_control, height=2, style="class:status"),
+                filter=~picker_filter,
+            ),
+            ConditionalContainer(
+                content=Window(content=picker_control, height=8, style="class:status"),
+                filter=picker_filter,
+            ),
+        ]
+    else:
+        bottom_elements = [
+            Window(height=1, char="─"),
+            Window(content=bottom_status_control, height=2, style="class:status"),
+        ]
 
     return HSplit([
         ConditionalContainer(
@@ -83,8 +104,7 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
         ),
         Window(height=1, char="─"),
         input_field,
-        Window(height=1, char="─"),
-        Window(content=bottom_status_control, height=2, style="class:status"),
+        *bottom_elements,
     ])
 
 

@@ -1,13 +1,144 @@
+import json
 import os as _os
+import uuid
 from datetime import datetime
+
+SESSIONS_DIR = "user/sessions"
+SESSION_FIELDS = (
+    "session_id", "session_name",
+    "conversation_history", "execution_history",
+    "current_dialogue", "sop_library_text",
+    "created_at",
+)
+
+
+def _get_sessions_dir() -> str:
+    """确保 user/sessions/ 存在并返回路径。"""
+    _os.makedirs(SESSIONS_DIR, exist_ok=True)
+    return SESSIONS_DIR
+
+
+def _generate_session_id() -> str:
+    """生成 12 位 hex 会话 ID。"""
+    return uuid.uuid4().hex[:12]
 
 
 def create_session_dir(base_dir: str = "history") -> str:
-    """创建会话目录并返回路径。"""
+    """创建会话目录并返回路径。同时确保 user/sessions/ 存在。"""
+    _get_sessions_dir()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = f"{base_dir}/{timestamp}_repl_session"
     _os.makedirs(path, exist_ok=True)
     return path
+
+
+def save_session(state: dict) -> str | None:
+    """保存当前会话到 user/sessions/{session_id}.json。
+
+    提取 SESSION_FIELDS 中的字段，写入 JSON 文件。
+    如 session_id 为空则自动生成，session_name 为空则设为 "Unnamed"。
+    返回 session_id，失败返回 None。
+    """
+    try:
+        _get_sessions_dir()
+        session_id = state.get("session_id", "") or _generate_session_id()
+        session_name = state.get("session_name", "") or "Unnamed"
+
+        data = {
+            "session_id": session_id,
+            "session_name": session_name,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "conversation_history": state.get("conversation_history", ""),
+            "execution_history": state.get("execution_history", ""),
+            "current_dialogue": state.get("current_dialogue", ""),
+            "sop_library_text": state.get("sop_library_text", ""),
+        }
+
+        filepath = f"{SESSIONS_DIR}/{session_id}.json"
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return session_id
+    except Exception as e:
+        print(f"[bold red]保存会话失败: {e}[/bold red]")
+        return None
+
+
+def load_session(session_id: str) -> dict | None:
+    """从 user/sessions/{session_id}.json 加载会话。
+
+    返回包含会话字段的 dict，文件不存在或损坏返回 None。
+    """
+    try:
+        filepath = f"{SESSIONS_DIR}/{session_id}.json"
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # 提取恢复所需字段
+        return {
+            "session_id": data.get("session_id", session_id),
+            "session_name": data.get("session_name", ""),
+            "created_at": data.get("created_at", ""),
+            "conversation_history": data.get("conversation_history", ""),
+            "execution_history": data.get("execution_history", ""),
+            "current_dialogue": data.get("current_dialogue", ""),
+            "sop_library_text": data.get("sop_library_text", ""),
+        }
+    except FileNotFoundError:
+        print(f"[bold red]会话未找到: {session_id}[/bold red]")
+        return None
+    except json.JSONDecodeError:
+        print(f"[bold red]会话文件已损坏: {session_id}[/bold red]")
+        return None
+    except Exception as e:
+        print(f"[bold red]加载会话失败: {e}[/bold red]")
+        return None
+
+
+def list_sessions() -> list[dict]:
+    """列出所有已保存会话，按创建时间降序排列。
+
+    返回 [{"session_id", "session_name", "created_at"}, ...]。
+    损坏文件自动跳过。
+    """
+    _get_sessions_dir()
+    sessions = []
+
+    try:
+        for fname in sorted(_os.listdir(SESSIONS_DIR), reverse=True):
+            if not fname.endswith(".json"):
+                continue
+            filepath = f"{SESSIONS_DIR}/{fname}"
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                sessions.append({
+                    "session_id": data.get("session_id", fname.replace(".json", "")),
+                    "session_name": data.get("session_name", "Unnamed"),
+                    "created_at": data.get("created_at", ""),
+                })
+            except (json.JSONDecodeError, Exception):
+                # 跳过损坏文件
+                continue
+    except FileNotFoundError:
+        pass
+
+    # 按 created_at 降序
+    sessions.sort(key=lambda s: s.get("created_at", ""), reverse=True)
+    return sessions
+
+
+def delete_session(session_id: str) -> bool:
+    """删除指定会话文件。"""
+    try:
+        filepath = f"{SESSIONS_DIR}/{session_id}.json"
+        _os.remove(filepath)
+        return True
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        print(f"[bold red]删除会话失败: {e}[/bold red]")
+        return False
 
 
 def write_run_summary(session_dir: str, user_query: str,

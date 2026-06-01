@@ -5,6 +5,8 @@ class OverallState(TypedDict):
     # === 用户输入与会话 ===
     user_instruction: str
     session_dir: str
+    session_id: str
+    session_name: str
     sop_library_text: str
 
     # === SOP 匹配结果 (UserCoordinator 输出) ===

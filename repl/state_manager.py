@@ -4,6 +4,8 @@ def create_initial_state(user_query: str, session_dir: str,
     return {
         "user_instruction": user_query,
         "session_dir": session_dir,
+        "session_id": "",
+        "session_name": "",
         "sop_library_text": sop_library_text,
 
         "matched_sop_id": "",

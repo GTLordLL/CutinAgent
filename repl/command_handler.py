@@ -1,6 +1,6 @@
 from prompt_toolkit.completion import Completer, Completion
 
-REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/exit", "/quit"]
+REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/resume", "/exit", "/quit"]
 
 
 class ReplCompleter(Completer):
@@ -24,7 +24,8 @@ def build_help_message(resources) -> str:
         "| `/sops` | 列出所有可用 SOP |",
         "| `/history` | 显示当前对话与执行历史摘要 |\n"
         "| `/compact [提示]` | 手动压缩对话上下文，可附带压缩要求 |",
-        "| `/clear` | 清除对话历史 |",
+        "| `/clear` | 保存当前会话并开始新会话 |",
+        "| `/resume` | 打开会话选择器，恢复历史会话 |",
         "| `/exit` | 退出 REPL |",
         "",
         "## 可用 SOP",
@@ -69,13 +70,17 @@ def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
         return True, "\n".join(lines), False
 
     if name == "/clear":
-        state["conversation_history"] = ""
-        state["execution_history"] = ""
-        state["current_dialogue"] = ""
-        return True, "对话历史已清除。", False
+        # 信号通知 main.py 保存旧会话并创建新会话
+        return True, "new_session", False
 
     if name == "/history":
         return True, build_history_message(state), False
+
+    if name == "/resume":
+        # /resume [session_id] — 直接加载或打开选择器
+        if len(parts) > 1:
+            return True, f"load_session:{parts[1]}", False
+        return True, "show_picker", False
 
     if name == "/compact":
         requirement = " ".join(parts[1:]) if len(parts) > 1 else ""

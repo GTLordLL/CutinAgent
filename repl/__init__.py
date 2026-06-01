@@ -1,6 +1,14 @@
 from repl.command_handler import dispatch_repl_command, ReplCompleter, REPL_COMMANDS
 from repl.state_manager import create_initial_state, reset_sop_state
-from repl.session_manager import create_session_dir, write_run_summary
+from repl.session_manager import (
+    create_session_dir,
+    write_run_summary,
+    save_session,
+    load_session,
+    list_sessions,
+    delete_session,
+    _generate_session_id,
+)
 from repl.sop_runner import run_sop_graph
 from repl.ui_renderer import (
     print_welcome,
@@ -16,6 +24,19 @@ from repl.app_builder import (
     create_layout,
     build_application,
 )
+from repl.session_picker import (
+    create_picker_state,
+    get_picker_condition,
+    create_picker_control,
+    activate_picker,
+    deactivate_picker,
+    picker_move_up,
+    picker_move_down,
+    picker_page_left,
+    picker_page_right,
+    picker_select,
+    picker_cancel,
+)
 
 __all__ = [
     "dispatch_repl_command",
@@ -25,6 +46,11 @@ __all__ = [
     "reset_sop_state",
     "create_session_dir",
     "write_run_summary",
+    "save_session",
+    "load_session",
+    "list_sessions",
+    "delete_session",
+    "_generate_session_id",
     "run_sop_graph",
     "print_welcome",
     "print_user_message",
@@ -36,4 +62,15 @@ __all__ = [
     "create_root_container",
     "create_layout",
     "build_application",
+    "create_picker_state",
+    "get_picker_condition",
+    "create_picker_control",
+    "activate_picker",
+    "deactivate_picker",
+    "picker_move_up",
+    "picker_move_down",
+    "picker_page_left",
+    "picker_page_right",
+    "picker_select",
+    "picker_cancel",
 ]

@@ -25,6 +25,21 @@ from repl import (
     reset_sop_state,
     run_sop_graph,
     write_run_summary,
+    save_session,
+    load_session,
+    list_sessions,
+    _generate_session_id,
+    create_picker_state,
+    get_picker_condition,
+    create_picker_control,
+    activate_picker,
+    deactivate_picker,
+    picker_move_up,
+    picker_move_down,
+    picker_page_left,
+    picker_page_right,
+    picker_select,
+    picker_cancel,
     ReplCompleter,
     print_welcome,
     print_user_message,
@@ -72,13 +87,20 @@ async def run_repl():
     console.print()
     print_welcome(console)
 
+    # 会话选择器状态
+    picker_state = create_picker_state()
+
     # ── Application 组件 ────────────────────────────────────────
 
     input_field = create_input_field(completer=ReplCompleter())
     top_status_control, top_status_data = create_top_status_bar()
     status_control, status_data = create_status_bar()
 
-    root = create_root_container(input_field, top_status_control, top_status_data, status_control)
+    root = create_root_container(
+        input_field, top_status_control, top_status_data, status_control,
+        picker_control=create_picker_control(picker_state),
+        picker_filter=get_picker_condition(picker_state),
+    )
     layout = create_layout(root, input_field)
 
     # 确认流程状态
@@ -117,6 +139,41 @@ async def run_repl():
     def _on_escape(event):
         input_field.buffer.text = ""
 
+    # ── 会话选择器按键绑定 ────────────────────────────────────────
+
+    picker_filter = get_picker_condition(picker_state)
+
+    @kb.add("enter", filter=picker_filter & has_focus(input_field))
+    def _on_picker_enter(event):
+        input_field.buffer.text = ""
+        picker_select(picker_state)
+        event.app.invalidate()
+
+    @kb.add("escape", filter=picker_filter & has_focus(input_field))
+    def _on_picker_escape(event):
+        picker_cancel(picker_state)
+        event.app.invalidate()
+
+    @kb.add("up", filter=picker_filter)
+    def _on_picker_up(event):
+        picker_move_up(picker_state)
+        event.app.invalidate()
+
+    @kb.add("down", filter=picker_filter)
+    def _on_picker_down(event):
+        picker_move_down(picker_state)
+        event.app.invalidate()
+
+    @kb.add("left", filter=picker_filter)
+    def _on_picker_left(event):
+        picker_page_left(picker_state)
+        event.app.invalidate()
+
+    @kb.add("right", filter=picker_filter)
+    def _on_picker_right(event):
+        picker_page_right(picker_state)
+        event.app.invalidate()
+
     app = build_application(layout, kb)
 
     # ── 输入处理逻辑 ────────────────────────────────────────────
@@ -135,6 +192,108 @@ async def run_repl():
                     app.exit(result="exit")
                     return
                 if handled:
+                    # /clear → 保存旧会话 + 开启新会话
+                    if msg == "new_session":
+                        if (state.get("conversation_history", "").strip() or
+                            state.get("execution_history", "").strip() or
+                            state.get("current_dialogue", "").strip()):
+                            saved_id = save_session(state)
+                            if saved_id:
+                                console.print(f"[dim]旧会话已保存: {saved_id}[/dim]")
+
+                        new_dir = create_session_dir()
+                        set_session_dir(new_dir)
+                        new_session_id = _generate_session_id()
+
+                        state["session_id"] = new_session_id
+                        state["session_name"] = ""
+                        state["session_dir"] = new_dir
+                        state["conversation_history"] = ""
+                        state["execution_history"] = ""
+                        state["current_dialogue"] = ""
+                        state["thinker_input_tokens"] = 0
+
+                        status_data["token_info"] = "0 (0.0%) tokens  ".rjust(
+                            shutil.get_terminal_size().columns
+                        )
+
+                        console.print(f"[bold green]新会话已创建[/bold green]")
+                        console.print(f"[dim]会话 ID: {new_session_id}[/dim]")
+                        console.print(f"[dim]会话目录: {new_dir}[/dim]")
+                        app.invalidate()
+                        return
+
+                    # /resume → 会话选择器
+                    if msg == "show_picker":
+                        sessions = list_sessions()
+                        if not sessions:
+                            console.print("[dim]没有已保存的会话。使用 /clear 开始新会话。[/dim]")
+                            return
+
+                        # 自动保存当前会话
+                        if (state.get("conversation_history", "").strip() or
+                            state.get("execution_history", "").strip() or
+                            state.get("current_dialogue", "").strip()):
+                            saved_id = save_session(state)
+                            if saved_id:
+                                console.print(f"[dim]当前会话已自动保存: {saved_id}[/dim]")
+
+                        activate_picker(picker_state, sessions)
+                        app.invalidate()
+
+                        await picker_state["result_event"].wait()
+                        result = deactivate_picker(picker_state)
+                        app.invalidate()
+
+                        if result.get("action") == "select":
+                            session_id = result["session_id"]
+                            loaded = load_session(session_id)
+                            if loaded:
+                                for key in ("session_id", "session_name",
+                                            "conversation_history", "execution_history",
+                                            "current_dialogue", "sop_library_text"):
+                                    if key in loaded:
+                                        state[key] = loaded[key]
+                                state["thinker_input_tokens"] = 0
+                                status_data["token_info"] = "0 (0.0%) tokens  ".rjust(
+                                    shutil.get_terminal_size().columns
+                                )
+                                console.print(f"[bold green]会话已恢复: {session_id}[/bold green]")
+                                console.print(f"[dim]名称: {loaded.get('session_name', 'Unnamed')}[/dim]")
+                                console.print(f"[dim]创建时间: {loaded.get('created_at', '?')}[/dim]")
+                                app.invalidate()
+                            else:
+                                console.print(f"[bold red]无法加载会话: {session_id}[/bold red]")
+                        else:
+                            console.print("[dim]已取消会话选择。[/dim]")
+                        return
+
+                    # /resume <id> → 直接加载
+                    if msg.startswith("load_session:"):
+                        session_id = msg.split(":", 1)[1]
+                        if (state.get("conversation_history", "").strip() or
+                            state.get("execution_history", "").strip() or
+                            state.get("current_dialogue", "").strip()):
+                            saved_id = save_session(state)
+                            if saved_id:
+                                console.print(f"[dim]当前会话已自动保存: {saved_id}[/dim]")
+                        loaded = load_session(session_id)
+                        if loaded:
+                            for key in ("session_id", "session_name",
+                                        "conversation_history", "execution_history",
+                                        "current_dialogue", "sop_library_text"):
+                                if key in loaded:
+                                    state[key] = loaded[key]
+                            state["thinker_input_tokens"] = 0
+                            status_data["token_info"] = "0 (0.0%) tokens  ".rjust(
+                                shutil.get_terminal_size().columns
+                            )
+                            console.print(f"[bold green]会话已恢复: {session_id}[/bold green]")
+                            app.invalidate()
+                        else:
+                            console.print(f"[bold red]会话未找到: {session_id}[/bold red]")
+                        return
+
                     # /compact 需要调用 LLM 压缩对话
                     if user_msg.strip().lower().startswith("/compact"):
                         if not state.get("current_dialogue", "").strip():
@@ -171,19 +330,19 @@ async def run_repl():
                                 console.print("[dim]对话压缩完成（无新摘要）。[/dim]")
                     else:
                         print_command_result(console, msg)
-                        # /clear 后重置 token 显示
-                        if user_msg.strip().lower() == "/clear":
-                            state["thinker_input_tokens"] = 0
-                            status_data["token_info"] = "0 (0.0%) tokens  ".rjust(
-                                shutil.get_terminal_size().columns
-                            )
-                            app.invalidate()
                     return
 
                 # 追加到当前对话
                 state["current_dialogue"] += f"User: {user_msg}\n"
                 state["user_instruction"] = user_msg
                 print_user_message(console, user_msg)
+
+                # 首次输入：自动命名 + 生成 session_id
+                if not state.get("session_name", ""):
+                    clean = user_msg.strip()
+                    state["session_name"] = clean[:10] if clean else "Unnamed"
+                if not state.get("session_id", ""):
+                    state["session_id"] = _generate_session_id()
 
                 # 自动压缩：上一轮 Thinker 输入超过 4096 tokens
                 if state.get("thinker_input_tokens", 0) > 4096 and state.get("current_dialogue", "").strip():
@@ -456,6 +615,16 @@ async def run_repl():
     except asyncio.CancelledError:
         pass
     finally:
+        # 退出时自动保存会话
+        if (state.get("conversation_history", "").strip() or
+            state.get("execution_history", "").strip() or
+            state.get("current_dialogue", "").strip()):
+            try:
+                saved_id = save_session(state)
+                if saved_id:
+                    console.print(f"[dim]会话已保存: {saved_id}[/dim]")
+            except Exception:
+                pass
         console.print("\n[bold]再见！[/bold]")
 
 
