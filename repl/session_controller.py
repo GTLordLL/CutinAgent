@@ -27,7 +27,7 @@ def save_current_if_dirty(state: dict, console, label: str = "当前会话") -> 
     """
     if (state.get("conversation_history", "").strip()
             or state.get("execution_history", "").strip()
-            or state.get("current_dialogue", "").strip()):
+            or len(state.get("current_dialogue", [])) > 0):
         saved_id = save_session(state)
         if saved_id:
             console.print(f"[dim]{label}已保存: {saved_id}[/dim]")
@@ -73,7 +73,7 @@ async def handle_new_session(state: dict, status_data: dict, app, console) -> No
     state["session_dir"] = new_dir
     state["conversation_history"] = ""
     state["execution_history"] = ""
-    state["current_dialogue"] = ""
+    state["current_dialogue"] = []
     state["thinker_input_tokens"] = 0
 
     status_data["token_info"] = "0 (0.0%) tokens  ".rjust(

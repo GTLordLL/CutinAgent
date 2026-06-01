@@ -88,7 +88,7 @@ async def run_repl():
     # ── 7. UI 组件 ──────────────────────────────────────────────
     picker_state = create_picker_state()
     sop_picker_state = create_sop_picker_state()
-    input_field = create_input_field(completer=ReplCompleter())
+    input_field = create_input_field(completer=ReplCompleter(), state=state)
     top_status_control, top_status_data = create_top_status_bar()
     status_control, status_data = create_status_bar()
 
@@ -176,7 +176,7 @@ async def run_repl():
                 # --- 普通消息 ----------------------------------------------------
 
                 # 追加到当前对话
-                state["current_dialogue"] += f"User: {user_msg}\n"
+                state["current_dialogue"].append({"role": "user", "content": user_msg})
                 state["user_instruction"] = user_msg
                 print_user_message(console, user_msg)
 
@@ -215,7 +215,7 @@ async def run_repl():
 
                 console.print()
                 print_agent_message(console, state["chat_message"])
-                state["current_dialogue"] += f"Agent: {state['chat_message']}\n"
+                state["current_dialogue"].append({"role": "agent", "content": state["chat_message"]})
                 _set_status(state.get("matched_sop_id", ""))
 
                 # --- 判断模式 --------------------------------------------------
@@ -231,7 +231,7 @@ async def run_repl():
                         user_msg = result["feedback"]
                         if not user_msg:
                             return
-                        state["current_dialogue"] += f"User (feedback): {user_msg}\n"
+                        state["current_dialogue"].append({"role": "feedback", "content": user_msg})
                         state["user_instruction"] = user_msg
                         return
 

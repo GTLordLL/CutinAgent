@@ -3,6 +3,7 @@ from rich.console import Console
 from validator.CompactorValidator import validate_compactor_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
+from repl.dialogue_utils import dialogue_to_text
 
 
 def task_compactor_node(resources):
@@ -24,7 +25,7 @@ def task_compactor_node(resources):
         round_num = state.get("current_round", 0)
 
         user_message = state.get("user_instruction", "")
-        current_dialogue = state.get("current_dialogue", "")
+        current_dialogue = state.get("current_dialogue", [])
         conversation_history = state.get("conversation_history", "")
         current_action = state.get("current_action", "")
         long_term_intent = state.get("long_term_intent", "")
@@ -46,7 +47,7 @@ def task_compactor_node(resources):
         # --- Thinker ---
         thinker_input = (
             f"USER_MESSAGE: {user_message}\n\n"
-            f"CURRENT_DIALOGUE: {current_dialogue or 'None'}\n\n"
+            f"CURRENT_DIALOGUE: {dialogue_to_text(current_dialogue) or 'None'}\n\n"
             f"CONVERSATION_HISTORY: {conversation_history or 'None'}\n\n"
             f"CURRENT_ACTION: {current_action}\n\n"
             f"LONG_TERM_INTENT: {long_term_intent or 'None'}\n\n"

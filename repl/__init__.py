@@ -1,4 +1,5 @@
 from repl.command_handler import dispatch_repl_command, ReplCompleter, REPL_COMMANDS, CmdSignal
+from repl.dialogue_utils import dialogue_to_text, parse_dialogue_text
 from repl.state_manager import create_initial_state, reset_sop_state
 from repl.session_manager import (
     create_session_dir,
@@ -69,6 +70,8 @@ __all__ = [
     "ReplCompleter",
     "REPL_COMMANDS",
     "CmdSignal",
+    "dialogue_to_text",
+    "parse_dialogue_text",
     "create_initial_state",
     "reset_sop_state",
     "create_session_dir",

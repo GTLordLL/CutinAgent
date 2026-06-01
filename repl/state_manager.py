@@ -35,7 +35,7 @@ def create_initial_state(user_query: str, session_dir: str,
         # REPL 状态
         "conversation_history": "",
         "execution_history": "",
-        "current_dialogue": "",
+        "current_dialogue": [],
         "chat_message": "",
         "current_action": "",
         "long_term_intent": "",

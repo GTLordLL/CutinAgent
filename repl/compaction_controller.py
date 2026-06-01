@@ -23,7 +23,7 @@ async def run_chat_compactor(chat_compactor_fn, state: dict,
     Returns:
         True 表示执行了压缩并产生了摘要，False 表示无对话可压缩
     """
-    if not state.get("current_dialogue", "").strip():
+    if len(state.get("current_dialogue", [])) == 0:
         return False
 
     if triggered_by == "auto":
@@ -42,7 +42,7 @@ async def run_chat_compactor(chat_compactor_fn, state: dict,
 
     if summary:
         state["conversation_history"] += "\n" + summary
-        state["current_dialogue"] = ""
+        state["current_dialogue"] = []
         if triggered_by == "manual":
             console.print(Panel(
                 summary,
@@ -63,7 +63,7 @@ async def try_auto_compact(state: dict, chat_compactor_fn,
         True 表示执行了自动压缩，False 表示无需压缩
     """
     if (state.get("thinker_input_tokens", 0) > 4096
-            and state.get("current_dialogue", "").strip()):
+            and len(state.get("current_dialogue", [])) > 0):
         return await run_chat_compactor(
             chat_compactor_fn, state, top_status_data, app, console,
             triggered_by="auto"

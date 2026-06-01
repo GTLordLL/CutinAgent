@@ -45,7 +45,7 @@ class OverallState(TypedDict):
     # === REPL 循环状态 (UserCoordinator + Compactor) ===
     conversation_history: str       # Compactor 压缩追加的对话历史
     execution_history: str          # Compactor 压缩追加的执行历史
-    current_dialogue: str           # 自上次 Compactor 运行以来的原始对话
+    current_dialogue: list           # 自上次 Compactor 运行以来的消息列表 [{"role":"user"|"agent"|"feedback"|"error", "content":str}]
     chat_message: str               # UserCoordinator 的聊天回复（始终输出）
     current_action: str             # UserCoordinator 输出的当前 SOP 执行行动
     long_term_intent: str           # UserCoordinator 输出的长远意图规划

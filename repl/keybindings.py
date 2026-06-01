@@ -8,6 +8,62 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import has_focus
 
 
+def _get_user_messages(state: dict) -> list[str]:
+    """从 current_dialogue 提取用户消息列表（去重，旧→新）。"""
+    if state is None:
+        return []
+    seen = set()
+    result = []
+    for m in state.get("current_dialogue", []):
+        if m.get("role") in ("user", "feedback"):
+            content = m.get("content", "")
+            if content and content not in seen:
+                seen.add(content)
+                result.append(content)
+    return result
+
+
+def _navigate_history(textarea, direction: str) -> None:
+    """在 current_dialogue 历史中导航（上=更早，下=更新）。
+
+    由 keybindings 中的 up/down 按键调用。
+    直接操作 textarea.buffer.text 实现历史切换。
+    """
+    state = getattr(textarea, '_state', None)
+    user_msgs = _get_user_messages(state)
+    if not user_msgs:
+        return
+
+    idx = getattr(textarea, '_hist_index', None)
+
+    if direction == "up":
+        if idx is None:
+            # 首次进入历史导航：保存当前输入
+            textarea._hist_saved = textarea.buffer.text
+            idx = len(user_msgs)
+
+        if idx > 0:
+            idx -= 1
+            textarea._hist_index = idx
+            textarea.buffer.text = user_msgs[idx]
+            textarea.buffer.cursor_position = len(textarea.buffer.text)
+
+    elif direction == "down":
+        if idx is None:
+            return  # 未在导航模式，忽略
+
+        if idx < len(user_msgs) - 1:
+            idx += 1
+            textarea._hist_index = idx
+            textarea.buffer.text = user_msgs[idx]
+            textarea.buffer.cursor_position = len(textarea.buffer.text)
+        else:
+            # 回到最新位置：恢复保存的原始输入
+            textarea._hist_index = None
+            textarea.buffer.text = getattr(textarea, '_hist_saved', '')
+            textarea.buffer.cursor_position = len(textarea.buffer.text)
+
+
 def create_keybindings(
     input_field,
     flags: dict,
@@ -37,11 +93,14 @@ def create_keybindings(
     """
     kb = KeyBindings()
 
-    # ── 正常 Enter：处理用户输入 ──
+    # ── 正常 Enter：提交用户输入（multiline 下覆盖默认换行行为）──
     @kb.add("enter", filter=has_focus(input_field))
     def _on_enter(event):
         text = input_field.buffer.text
         input_field.buffer.text = ""
+
+        # 重置历史导航状态
+        input_field._hist_index = None
 
         if flags["waiting_confirm"]:
             confirm_value["text"] = text
@@ -53,6 +112,11 @@ def create_keybindings(
             flags["processing"] = True
             event.app.create_background_task(handle_input_coro(text.strip()))
 
+    # ── Escape Enter：插入换行（multiline 模式下手动换行，替代不可检测的 Shift+Enter）──
+    @kb.add("escape", "enter", filter=has_focus(input_field))
+    def _on_escape_enter(event):
+        input_field.buffer.insert_text("\n")
+
     # ── Ctrl-C：退出 Application ──
     @kb.add("c-c")
     def _on_ctrl_c(event):
@@ -62,6 +126,22 @@ def create_keybindings(
     @kb.add("escape", filter=has_focus(input_field))
     def _on_escape(event):
         input_field.buffer.text = ""
+        input_field._hist_index = None
+
+    # ── Up/Down：历史输入导航（仅在无 picker 时生效）──
+    _hist_filter = has_focus(input_field)
+    if picker_filter is not None:
+        _hist_filter = _hist_filter & ~picker_filter
+    if sop_picker_filter is not None:
+        _hist_filter = _hist_filter & ~sop_picker_filter
+
+    @kb.add("up", filter=_hist_filter)
+    def _on_history_up(event):
+        _navigate_history(input_field, direction="up")
+
+    @kb.add("down", filter=_hist_filter)
+    def _on_history_down(event):
+        _navigate_history(input_field, direction="down")
 
     # ── 会话选择器按键：仅在 picker 激活时生效 ──
     from repl.session_picker import (

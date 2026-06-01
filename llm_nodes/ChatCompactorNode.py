@@ -3,6 +3,7 @@ from rich.console import Console
 from validator.ChatCompactorValidator import validate_chat_compactor_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
+from repl.dialogue_utils import dialogue_to_text
 
 
 def chat_compactor_node(resources):
@@ -29,14 +30,14 @@ def chat_compactor_node(resources):
 
         compact_requirement = state.get("chat_compact_requirement", "")
         user_message = state.get("user_instruction", "")
-        current_dialogue = state.get("current_dialogue", "")
+        current_dialogue = state.get("current_dialogue", [])
         conversation_history = state.get("conversation_history", "")
 
         # --- Thinker ---
         thinker_input = (
             f"COMPACT_REQUIREMENT: {compact_requirement or 'None'}\n\n"
             f"USER_MESSAGE: {user_message}\n\n"
-            f"CURRENT_DIALOGUE: {current_dialogue or 'None'}\n\n"
+            f"CURRENT_DIALOGUE: {dialogue_to_text(current_dialogue) or 'None'}\n\n"
             f"CONVERSATION_HISTORY: {conversation_history or 'None'}\n"
         )
         thinker_raw = (

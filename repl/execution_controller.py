@@ -71,7 +71,7 @@ async def execute_sop_flow(
         )
     except ValueError as e:
         console.print(f"[bold red]SOP 加载失败: {e}[/bold red]")
-        state["current_dialogue"] += f"Agent (error): SOP load failed: {e}\n"
+        state["current_dialogue"].append({"role": "error", "content": f"SOP load failed: {e}"})
         return state
 
     saved_sop_id = state["matched_sop_id"]
@@ -141,7 +141,7 @@ async def execute_sop_flow(
         console.print(f"[bold red]SOP 执行崩溃: {e}[/bold red]")
         import traceback
         traceback.print_exc()
-        state["current_dialogue"] += f"Agent (error): SOP execution failed: {e}\n"
+        state["current_dialogue"].append({"role": "error", "content": f"SOP execution failed: {e}"})
         return state
 
     sop_elapsed = time.time() - sop_start
@@ -184,8 +184,8 @@ async def execute_sop_flow(
             state["conversation_history"] += "\n" + state["compactor_conversation_summary"]
         if state["compactor_execution_summary"]:
             state["execution_history"] += "\n" + state["compactor_execution_summary"]
-        state["current_dialogue"] = ""
-        console.print("[dim]总结已记录。请继续下一个任务。[/dim]")
+        state["current_dialogue"] = []
+        console.print("[dim]总结已记录。可以继续下一个任务了。[/dim]")
     else:
         console.print("[dim]总结未记录。请告诉我如何调整？[/dim]")
 

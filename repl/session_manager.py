@@ -2,6 +2,7 @@ import json
 import os as _os
 import uuid
 from datetime import datetime
+from repl.dialogue_utils import parse_dialogue_text
 
 SESSIONS_DIR = "user/sessions"
 SESSION_FIELDS = (
@@ -21,6 +22,15 @@ def _get_sessions_dir() -> str:
 def generate_session_id() -> str:
     """生成 12 位 hex 会话 ID。"""
     return uuid.uuid4().hex[:12]
+
+
+def _load_dialogue(raw) -> list[dict]:
+    """加载 current_dialogue，向后兼容旧 str 格式。"""
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, str):
+        return parse_dialogue_text(raw)
+    return []
 
 
 def create_session_dir(base_dir: str = "history") -> str:
@@ -50,7 +60,7 @@ def save_session(state: dict) -> str | None:
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "conversation_history": state.get("conversation_history", ""),
             "execution_history": state.get("execution_history", ""),
-            "current_dialogue": state.get("current_dialogue", ""),
+            "current_dialogue": state.get("current_dialogue", []),
             "sop_ids": state.get("sop_ids", []),
         }
 
@@ -88,7 +98,7 @@ def load_session(session_id: str) -> dict | None:
             "created_at": data.get("created_at", ""),
             "conversation_history": data.get("conversation_history", ""),
             "execution_history": data.get("execution_history", ""),
-            "current_dialogue": data.get("current_dialogue", ""),
+            "current_dialogue": _load_dialogue(data.get("current_dialogue", [])),
             "sop_ids": sop_ids,
         }
     except FileNotFoundError:

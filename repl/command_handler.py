@@ -1,5 +1,6 @@
 from prompt_toolkit.completion import Completer, Completion
 from utils.sop_loader import build_sop_library_index
+from repl.dialogue_utils import dialogue_to_text
 
 REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/resume", "/exit", "/quit"]
 
@@ -72,7 +73,7 @@ def _build_help_message(resources) -> str:
         "| 命令 | 说明 |",
         "|------|------|",
         "| `/help` | 显示此帮助信息 |",
-        "| `/sops` | 列出所有可用 SOP |",
+        "| `/sops` | 列出所有可用 SOP (可以选择) |",
         "| `/history` | 显示当前对话与执行历史摘要 |\n"
         "| `/compact [提示]` | 手动压缩对话上下文，可附带压缩要求 |",
         "| `/clear` | 保存当前会话并开始新会话 |",
@@ -93,8 +94,9 @@ def _build_history_message(state: dict) -> str:
     lines = ["# 当前会话状态"]
     ch = state.get("conversation_history", "")
     eh = state.get("execution_history", "")
-    cd = state.get("current_dialogue", "")
+    cd = state.get("current_dialogue", [])
+    cd_text = dialogue_to_text(cd) if cd else "(空)"
     lines.append(f"\n## 对话历史\n\n{ch if ch else '(空)'}")
     lines.append(f"\n## 执行历史\n\n{eh if eh else '(空)'}")
-    lines.append(f"\n## 当前对话\n\n{cd if cd else '(空)'}")
+    lines.append(f"\n## 当前对话\n\n{cd_text}")
     return "\n".join(lines)

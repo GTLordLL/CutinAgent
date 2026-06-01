@@ -3,6 +3,7 @@ from rich.console import Console
 from validator.UserCoordinatorValidator import validate_coordinator_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
+from repl.dialogue_utils import dialogue_to_text
 
 
 def user_coordinator_node(resources):
@@ -28,7 +29,7 @@ def user_coordinator_node(resources):
 
         user_message = state.get("user_instruction", "")
         conversation_history = state.get("conversation_history", "")
-        current_dialogue = state.get("current_dialogue", "")
+        current_dialogue = state.get("current_dialogue", [])
         execution_history = state.get("execution_history", "")
         from utils.sop_loader import build_sop_library_from_ids
         sop_ids = state.get("sop_ids", [])
@@ -37,7 +38,7 @@ def user_coordinator_node(resources):
         # --- Thinker ---
         thinker_input = (
             f"USER_MESSAGE: {user_message}\n\n"
-            f"CURRENT_DIALOGUE: {current_dialogue or 'None'}\n\n"
+            f"CURRENT_DIALOGUE: {dialogue_to_text(current_dialogue) or 'None'}\n\n"
             f"CONVERSATION_HISTORY: {conversation_history or 'None'}\n\n"
             f"EXECUTION_HISTORY: {execution_history or 'None'}\n\n"
             f"SOP_LIBRARY:\n{sop_library}\n"

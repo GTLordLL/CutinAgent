@@ -5,24 +5,69 @@
 """
 
 from prompt_toolkit import Application
-from prompt_toolkit.layout import Layout, HSplit, Window, ConditionalContainer
+from prompt_toolkit.layout import Layout, HSplit, Window, ConditionalContainer, Dimension
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.widgets import TextArea
-from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.history import History
 from prompt_toolkit.completion import Completer
 
 
-def create_input_field(completer: Completer | None = None) -> TextArea:
-    """创建用户输入区域。"""
-    return TextArea(
+class DialogueHistory(History):
+    """从 current_dialogue 列表中提取用户消息作为输入历史。
+
+    自动去重（连续重复消息合并），按时间顺序排列。
+    """
+
+    def __init__(self, state: dict):
+        super().__init__()
+        self.state = state
+
+    def load_history_strings(self) -> list[str]:
+        """返回历史输入列表（去重，最近的在最后）。"""
+        seen = set()
+        result = []
+        for m in self.state.get("current_dialogue", []):
+            if m.get("role") in ("user", "feedback"):
+                content = m.get("content", "")
+                if content and content not in seen:
+                    seen.add(content)
+                    result.append(content)
+        return result
+
+    def store_string(self, string: str) -> None:
+        """存储由 main.py 的 append 操作负责，此处不重复。"""
+        pass
+
+
+def create_input_field(completer: Completer | None = None,
+                       state: dict | None = None) -> TextArea:
+    """创建多行用户输入区域。
+
+    - multiline=True 支持换行和自动换行
+    - 动态高度：BufferControl 自报内容高度，Dimension(min=1, max=10) 做上下限
+    - dont_extend_height=True 确保不占用多余空间，内容减少时自动缩回
+    - Escape+Enter 手动换行，Enter 提交（通过 keybindings 处理）
+    - 使用 DialogueHistory 从 current_dialogue 提取历史输入
+    """
+    history = DialogueHistory(state) if state is not None else None
+
+    ta = TextArea(
         text="",
-        multiline=False,
+        multiline=True,
+        wrap_lines=True,
+        dont_extend_height=True,
+        height=Dimension(min=1, max=10),
         prompt="> ",
-        history=InMemoryHistory(),
+        history=history,
         completer=completer,
         style="class:input",
     )
+    # 历史导航状态：由 keybindings 中的 up/down 使用
+    ta._state = state          # 指向 current_dialogue
+    ta._hist_index = None      # None = 未在导航模式
+    ta._hist_saved = ""        # 导航前保存的当前输入文本
+    return ta
 
 
 def create_top_status_bar() -> tuple[FormattedTextControl, dict]:
