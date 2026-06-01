@@ -1,14 +1,19 @@
 import time
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 from utils.debug_logger import log_state_snapshot
 
 
 def run_sop_graph(app, state: dict, console=None) -> tuple[dict, list, str, int, list]:
     """运行 SOP 执行图。
 
+    每完成一个节点即通过 console 实时渲染 Panel，同时收集 node_outputs
+    供调用方做汇总。console 为 None 时使用默认 Console。
+
     Returns:
         (state, node_timings, final_task_status, total_rounds, node_outputs)
         node_outputs: [{"node_name", "duration", "detail_lines", "output"}, ...]
-        调用方可按需渲染 (Rich Panel) 或做其他处理。
     """
     node_timings = []
     node_outputs = []
@@ -16,6 +21,7 @@ def run_sop_graph(app, state: dict, console=None) -> tuple[dict, list, str, int,
     total_rounds = 0
     active_round = 0
     node_start = time.time()
+    c = console or Console()
 
     for event in app.stream(state, stream_mode="updates"):
         if event:
@@ -60,6 +66,14 @@ def run_sop_graph(app, state: dict, console=None) -> tuple[dict, list, str, int,
                         detail_lines.append(f"计划: {plan_display[:200]}...")
                     else:
                         detail_lines.append(f"计划: {plan_display}")
+
+                # 实时渲染 Panel（每完成一个节点立即输出，保持原流程行为）
+                if node_name == "progress_updater":
+                    subtitle = node_name
+                else:
+                    subtitle = f"{node_name}  [italic]{duration:.2f}s[/italic]"
+                body = Text("\n".join(detail_lines) if detail_lines else "(无输出)", style="")
+                c.print(Panel(body, title=subtitle, title_align="left", padding=(0, 1)))
 
                 node_outputs.append({
                     "node_name": node_name,

@@ -124,16 +124,12 @@ async def execute_sop_flow(
     sop_timer_task = asyncio.create_task(_sop_timer())
 
     try:
-        state, node_timings, final_task_status, total_rounds, node_outputs = (
+        state, node_timings, final_task_status, total_rounds, _node_outputs = (
             await loop.run_in_executor(
                 None, run_sop_graph, app_graph, state, console
             )
         )
         await asyncio.sleep(0.3)
-
-        # 渲染节点输出 Panel（原 sop_runner 中的渲染职责移至此）
-        for node_out in node_outputs:
-            _render_node_panel(node_out, console)
 
     except Exception as e:
         sop_stop.set()
@@ -204,20 +200,3 @@ async def execute_sop_flow(
 
     clear_variables()
     return state
-
-
-def _render_node_panel(node_out: dict, console: Console) -> None:
-    """渲染单个节点输出为 Rich Panel（原 sop_runner 中的渲染逻辑）。"""
-    from rich.text import Text
-
-    node_name = node_out["node_name"]
-    duration = node_out["duration"]
-    detail_lines = node_out["detail_lines"]
-
-    if node_name == "progress_updater":
-        subtitle = node_name
-    else:
-        subtitle = f"{node_name}  [italic]{duration:.2f}s[/italic]"
-
-    body = Text("\n".join(detail_lines) if detail_lines else "(无输出)", style="")
-    console.print(Panel(body, title=subtitle, title_align="left", padding=(0, 1)))
