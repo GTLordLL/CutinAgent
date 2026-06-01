@@ -5,7 +5,7 @@ import pandas as pd
 from config.load_model_config import load_model_config, get_ollama_url
 from utils.load_prompts import load_prompt_file
 from utils.load_csv import load_csv_df
-from utils.sop_loader import build_sop_library_index, load_sop_markdown
+from utils.sop_loader import load_sop_markdown
 from langchain_ollama import ChatOllama
 
 
@@ -18,7 +18,6 @@ class LLMResources:
     tools_df: pd.DataFrame
 
     sops_df: pd.DataFrame
-    sop_library_text: str
     sop_dir: str
 
     def get_llm(self, model_key: str = ""):
@@ -74,7 +73,6 @@ def initialize_resources() -> LLMResources:
         raise FileNotFoundError("致命错误：无法加载 sop/sops.csv")
 
     sop_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sop")
-    sop_library_text = build_sop_library_index(sops_df)
 
     return LLMResources(
         llms=llms,
@@ -82,6 +80,5 @@ def initialize_resources() -> LLMResources:
         prompts=prompts,
         tools_df=tools_df,
         sops_df=sops_df,
-        sop_library_text=sop_library_text,
         sop_dir=sop_dir,
     )

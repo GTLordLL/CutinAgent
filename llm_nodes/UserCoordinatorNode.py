@@ -30,7 +30,9 @@ def user_coordinator_node(resources):
         conversation_history = state.get("conversation_history", "")
         current_dialogue = state.get("current_dialogue", "")
         execution_history = state.get("execution_history", "")
-        sop_library = state.get("sop_library_text", "")
+        from utils.sop_loader import build_sop_library_from_ids
+        sop_ids = state.get("sop_ids", [])
+        sop_library = build_sop_library_from_ids(sops_df, sop_ids)
 
         # --- Thinker ---
         thinker_input = (

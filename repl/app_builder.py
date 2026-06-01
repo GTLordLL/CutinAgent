@@ -52,8 +52,8 @@ def create_status_bar(default_text: str = "CutinAgent REPL — /help 查看命�
     def _get_status():
         line2 = status_data.get("token_info", "")
         if line2:
-            return f"{status_data['text']}\n{line2}"
-        return status_data["text"]
+            return [("fg:ansigray", f"{status_data['text']}\n{line2}")]
+        return [("fg:ansigray", status_data["text"])]
 
     return FormattedTextControl(_get_status), status_data
 
@@ -62,7 +62,9 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
                          top_status_data: dict,
                          bottom_status_control: FormattedTextControl,
                          picker_control: FormattedTextControl = None,
-                         picker_filter=None) -> HSplit:
+                         picker_filter=None,
+                         sop_picker_control: FormattedTextControl = None,
+                         sop_picker_filter=None) -> HSplit:
     """构建 HSplit 布局，顶部状态栏动态高度。
 
     布局结构（从上到下）：
@@ -70,23 +72,45 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
         顶部分隔线 (height=1, char="─")
         输入区域 (TextArea)
         底部分隔线 (height=1, char="─")
-        底部状态栏 (height=2) / 会话选择器 (height=8, picker 激活时覆盖)
+        底部状态栏 (height=2) / 会话选择器 (height=8) / SOP选择器 (height=10)
     """
     has_runtime = Condition(lambda: bool(top_status_data.get("runtime_text", "")))
 
-    # 底部区域：正常状态栏与会话选择器条件切换
-    if picker_control is not None and picker_filter is not None:
+    has_picker = picker_control is not None and picker_filter is not None
+    has_sop_picker = sop_picker_control is not None and sop_picker_filter is not None
+
+    # 底部区域：正常状态栏与选择器条件切换（互斥）
+    if has_picker or has_sop_picker:
+        # 构建 "任一选择器活跃" 的组合过滤器
+        if has_picker and has_sop_picker:
+            any_picker = picker_filter | sop_picker_filter
+        elif has_picker:
+            any_picker = picker_filter
+        else:
+            any_picker = sop_picker_filter
+
         bottom_elements = [
             Window(height=1, char="─"),
             ConditionalContainer(
                 content=Window(content=bottom_status_control, height=2, style="class:status"),
-                filter=~picker_filter,
-            ),
-            ConditionalContainer(
-                content=Window(content=picker_control, height=8, style="class:status"),
-                filter=picker_filter,
+                filter=~any_picker,
             ),
         ]
+        if has_picker:
+            bottom_elements.append(
+                ConditionalContainer(
+                    content=Window(content=picker_control, height=8, style="class:status"),
+                    filter=picker_filter,
+                ),
+            )
+        if has_sop_picker:
+            from repl.sop_picker import SOP_PICKER_HEIGHT
+            bottom_elements.append(
+                ConditionalContainer(
+                    content=Window(content=sop_picker_control, height=SOP_PICKER_HEIGHT, style="class:status"),
+                    filter=sop_picker_filter,
+                ),
+            )
     else:
         bottom_elements = [
             Window(height=1, char="─"),

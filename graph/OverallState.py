@@ -7,7 +7,7 @@ class OverallState(TypedDict):
     session_dir: str
     session_id: str
     session_name: str
-    sop_library_text: str
+    sop_ids: list[str]
 
     # === SOP 匹配结果 (UserCoordinator 输出) ===
     matched_sop_id: str

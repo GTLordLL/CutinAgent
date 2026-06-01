@@ -25,6 +25,10 @@ from repl import (
     create_picker_state,
     get_picker_condition,
     create_picker_control,
+    # SOP Picker
+    create_sop_picker_state,
+    get_sop_picker_condition,
+    create_sop_picker_control,
     # UI
     print_welcome,
     print_user_message,
@@ -44,6 +48,7 @@ from repl import (
     handle_new_session,
     handle_show_picker,
     handle_load_session,
+    handle_show_sop_picker,
     execute_sop_flow,
     create_keybindings,
 )
@@ -72,7 +77,8 @@ async def run_repl():
     console.print(f"[dim]会话目录: {session_dir}[/dim]")
 
     # ── 5. 初始 State ───────────────────────────────────────────
-    state = create_initial_state("", session_dir, resources.sop_library_text)
+    all_sop_ids = list(resources.sops_df["SOP_ID"].tolist())
+    state = create_initial_state("", session_dir, all_sop_ids)
     valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist())
 
     # ── 6. 欢迎界面 ─────────────────────────────────────────────
@@ -81,15 +87,19 @@ async def run_repl():
 
     # ── 7. UI 组件 ──────────────────────────────────────────────
     picker_state = create_picker_state()
+    sop_picker_state = create_sop_picker_state()
     input_field = create_input_field(completer=ReplCompleter())
     top_status_control, top_status_data = create_top_status_bar()
     status_control, status_data = create_status_bar()
 
     picker_filter = get_picker_condition(picker_state)
+    sop_picker_filter = get_sop_picker_condition(sop_picker_state)
     root = create_root_container(
         input_field, top_status_control, top_status_data, status_control,
         picker_control=create_picker_control(picker_state),
         picker_filter=picker_filter,
+        sop_picker_control=create_sop_picker_control(sop_picker_state),
+        sop_picker_filter=sop_picker_filter,
     )
     layout = create_layout(root, input_field)
 
@@ -142,6 +152,14 @@ async def run_repl():
                         session_id = msg.split(":", 1)[1]
                         await handle_load_session(
                             session_id, state, status_data, app, console
+                        )
+                        return
+
+                    # /sops → SOP 选择器
+                    if msg == CmdSignal.SHOW_SOP_PICKER:
+                        await handle_show_sop_picker(
+                            sop_picker_state, state, resources, status_data,
+                            app, console
                         )
                         return
 
@@ -226,7 +244,8 @@ async def run_repl():
     # ── 11. 按键绑定 ────────────────────────────────────────────
     kb = create_keybindings(
         input_field, flags, confirm_event, confirm_value,
-        picker_state, picker_filter, _handle_input,
+        picker_state, picker_filter,
+        sop_picker_state, sop_picker_filter, _handle_input,
     )
 
     app = build_application(layout, kb)

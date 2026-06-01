@@ -37,6 +37,20 @@ from repl.session_picker import (
     picker_select,
     picker_cancel,
 )
+from repl.sop_picker import (
+    create_sop_picker_state,
+    get_sop_picker_condition,
+    create_sop_picker_control,
+    activate_sop_picker,
+    deactivate_sop_picker,
+    sop_picker_enter,
+    sop_picker_cancel,
+    sop_picker_move_up,
+    sop_picker_move_down,
+    sop_picker_page_left,
+    sop_picker_page_right,
+    SOP_PICKER_HEIGHT,
+)
 from repl.llm_runner import run_llm_node, fmt_elapsed
 from repl.compaction_controller import run_chat_compactor, try_auto_compact
 from repl.session_controller import (
@@ -45,6 +59,7 @@ from repl.session_controller import (
     handle_new_session,
     handle_show_picker,
     handle_load_session,
+    handle_show_sop_picker,
 )
 from repl.execution_controller import execute_sop_flow
 from repl.keybindings import create_keybindings
@@ -85,6 +100,18 @@ __all__ = [
     "picker_page_right",
     "picker_select",
     "picker_cancel",
+    "create_sop_picker_state",
+    "get_sop_picker_condition",
+    "create_sop_picker_control",
+    "activate_sop_picker",
+    "deactivate_sop_picker",
+    "sop_picker_enter",
+    "sop_picker_cancel",
+    "sop_picker_move_up",
+    "sop_picker_move_down",
+    "sop_picker_page_left",
+    "sop_picker_page_right",
+    "SOP_PICKER_HEIGHT",
     "run_llm_node",
     "fmt_elapsed",
     "run_chat_compactor",
@@ -94,6 +121,7 @@ __all__ = [
     "handle_new_session",
     "handle_show_picker",
     "handle_load_session",
+    "handle_show_sop_picker",
     "execute_sop_flow",
     "create_keybindings",
 ]

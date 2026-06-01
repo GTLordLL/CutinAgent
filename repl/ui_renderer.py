@@ -27,7 +27,7 @@ def print_welcome(console: Console):
     )
 
     print(sep)
-    print(banner)
+    print(banner) # 记得保持使用原始print打印banner，因为rich打印banner的颜色会显示错误
 
     console.print(Text.assemble(
         ("  当前目录：", "dim"),

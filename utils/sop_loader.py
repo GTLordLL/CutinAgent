@@ -14,6 +14,31 @@ def build_sop_library_index(sops_df) -> str:
     return "\n".join(lines)
 
 
+def build_sop_library_from_ids(sops_df, sop_ids: list[str]) -> str:
+    """根据指定的 sop_ids 列表构造 SOP 匹配文本。
+
+    只输出 sop_ids 中存在的 SOP；不存在的 ID 静默跳过。
+    格式与 build_sop_library_index() 相同：SOP_ID | Objective | Description
+    """
+    if not sop_ids:
+        return (
+            "No executable SOPs are available. "
+            "You may chat with the user and suggest SOP recommendations, "
+            "but entering the task execution phase is prohibited "
+            "(IS_EXECUTE must always be false)."
+        )
+
+    ids_set = set(sop_ids)
+    lines = []
+    for _, row in sops_df.iterrows():
+        sid = row["SOP_ID"]
+        if sid in ids_set:
+            obj = row["Objective"]
+            desc = row.get("Description", "")
+            lines.append(f"{sid} | {obj} | {desc}")
+    return "\n".join(lines)
+
+
 def load_sop_markdown(sop_id: str, sop_dir: str,
                       valid_tool_ids: set | None = None) -> dict:
     """加载单个 SOP 的完整 markdown 文件并解析各字段。

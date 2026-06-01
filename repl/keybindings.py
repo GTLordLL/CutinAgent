@@ -15,7 +15,9 @@ def create_keybindings(
     confirm_value: dict,
     picker_state: dict,
     picker_filter,
-    handle_input_coro,
+    sop_picker_state: dict = None,
+    sop_picker_filter=None,
+    handle_input_coro=None,
 ) -> KeyBindings:
     """创建 Application 的全局按键绑定。
 
@@ -26,6 +28,8 @@ def create_keybindings(
         confirm_value: mutable dict，传递确认流程中的用户输入文本
         picker_state: 会话选择器状态 dict
         picker_filter: picker 激活时的 Condition 过滤器
+        sop_picker_state: SOP 选择器状态 dict（可选）
+        sop_picker_filter: SOP picker 激活时的 Condition 过滤器（可选）
         handle_input_coro: async 回调，接收用户输入文本，签名 (text: str) -> awaitable
 
     Returns:
@@ -96,5 +100,44 @@ def create_keybindings(
     def _on_picker_right(event):
         picker_page_right(picker_state)
         event.app.invalidate()
+
+    # ── SOP 选择器按键：仅在 SOP picker 激活时生效 ──
+    if sop_picker_state is not None and sop_picker_filter is not None:
+        from repl.sop_picker import (
+            sop_picker_enter, sop_picker_cancel,
+            sop_picker_move_up, sop_picker_move_down,
+            sop_picker_page_left, sop_picker_page_right,
+        )
+
+        @kb.add("enter", filter=sop_picker_filter & has_focus(input_field))
+        def _on_sop_picker_enter(event):
+            input_field.buffer.text = ""
+            sop_picker_enter(sop_picker_state)
+            event.app.invalidate()
+
+        @kb.add("escape", filter=sop_picker_filter & has_focus(input_field))
+        def _on_sop_picker_escape(event):
+            sop_picker_cancel(sop_picker_state)
+            event.app.invalidate()
+
+        @kb.add("up", filter=sop_picker_filter)
+        def _on_sop_picker_up(event):
+            sop_picker_move_up(sop_picker_state)
+            event.app.invalidate()
+
+        @kb.add("down", filter=sop_picker_filter)
+        def _on_sop_picker_down(event):
+            sop_picker_move_down(sop_picker_state)
+            event.app.invalidate()
+
+        @kb.add("left", filter=sop_picker_filter)
+        def _on_sop_picker_left(event):
+            sop_picker_page_left(sop_picker_state)
+            event.app.invalidate()
+
+        @kb.add("right", filter=sop_picker_filter)
+        def _on_sop_picker_right(event):
+            sop_picker_page_right(sop_picker_state)
+            event.app.invalidate()
 
     return kb

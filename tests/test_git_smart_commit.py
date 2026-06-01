@@ -79,7 +79,7 @@ def run_test():
         initial_input: OverallState = {
             "user_instruction": "帮我提交代码",
             "session_dir": session_dir,
-            "sop_library_text": resources.sop_library_text,
+            "sop_ids": list(resources.sops_df["SOP_ID"].tolist()),
 
             "matched_sop_id": "",
             "sop_objective": "",

@@ -16,7 +16,7 @@ from data_nodes.VariableStore import clear as clear_variables
 from repl.state_manager import reset_sop_state
 from repl.sop_runner import run_sop_graph
 from repl.session_manager import write_run_summary
-from repl.llm_runner import run_llm_node, fmt_elapsed
+from repl.llm_runner import fmt_elapsed
 
 
 async def execute_sop_flow(
@@ -96,7 +96,7 @@ async def execute_sop_flow(
         "current_round": 0,
     })
 
-    # ── 3. 执行 SOP 图 ──
+    # ── 3. 执行 SOP 图 + TaskCompactor（单一计时器） ──
     set_status_fn(f"执行中: {state['matched_sop_id']}")
     console.print(Panel(
         f"开始执行 SOP: [bold]{state['matched_sop_id']}[/bold]\n"
@@ -109,6 +109,7 @@ async def execute_sop_flow(
     sop_stop = asyncio.Event()
 
     async def _sop_timer():
+        """单一计时器：覆盖 SOP 执行 + TaskCompactor 全过程。"""
         try:
             while not sop_stop.is_set():
                 elapsed = time.time() - sop_start
@@ -123,6 +124,7 @@ async def execute_sop_flow(
 
     sop_timer_task = asyncio.create_task(_sop_timer())
 
+    # ── 3a. 运行 SOP 图 ──
     try:
         state, node_timings, final_task_status, total_rounds, _node_outputs = (
             await loop.run_in_executor(
@@ -151,15 +153,15 @@ async def execute_sop_flow(
     ))
     set_status_fn(f"完成: {state['matched_sop_id']}")
 
-    # ── 4. TaskCompactor ──
+    # ── 3b. TaskCompactor（不单独计时，复用 SOP 计时器）──
     console.print("[dim][TaskCompactor] 评价与总结中...[/dim]")
-    compactor_result, _ = await run_llm_node(
-        "TaskCompactor", task_compactor_fn, state,
-        top_status_data, app, console
+    compactor_result = await loop.run_in_executor(
+        None, task_compactor_fn, state
     )
     await asyncio.sleep(0.3)
     state.update(compactor_result)
 
+    # 停止单一计时器
     total_elapsed = time.time() - sop_start
     sop_stop.set()
     await sop_timer_task

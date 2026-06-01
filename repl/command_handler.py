@@ -1,4 +1,5 @@
 from prompt_toolkit.completion import Completer, Completion
+from utils.sop_loader import build_sop_library_index
 
 REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/resume", "/exit", "/quit"]
 
@@ -12,6 +13,7 @@ class CmdSignal:
     NEW_SESSION = "new_session"
     SHOW_PICKER = "show_picker"
     LOAD_SESSION_PREFIX = "load_session:"
+    SHOW_SOP_PICKER = "show_sop_picker"
 
 
 class ReplCompleter(Completer):
@@ -40,10 +42,7 @@ def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
         return True, _build_help_message(resources), False
 
     if name == "/sops":
-        lines = ["# 可用 SOP 列表", ""]
-        for line in resources.sop_library_text.strip().split("\n"):
-            lines.append(f"- {line}")
-        return True, "\n".join(lines), False
+        return True, CmdSignal.SHOW_SOP_PICKER, False
 
     if name == "/clear":
         return True, CmdSignal.NEW_SESSION, False
@@ -83,7 +82,8 @@ def _build_help_message(resources) -> str:
         "## 可用 SOP",
         "",
     ]
-    for line in resources.sop_library_text.strip().split("\n"):
+    sop_text = build_sop_library_index(resources.sops_df)
+    for line in sop_text.strip().split("\n"):
         lines.append(f"- {line}")
     return "\n".join(lines)
 

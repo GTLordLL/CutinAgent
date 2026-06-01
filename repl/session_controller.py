@@ -38,7 +38,7 @@ def save_current_if_dirty(state: dict, console, label: str = "当前会话") -> 
 _RESTORE_KEYS = (
     "session_id", "session_name",
     "conversation_history", "execution_history",
-    "current_dialogue", "sop_library_text",
+    "current_dialogue", "sop_ids",
 )
 
 
@@ -128,3 +128,33 @@ async def handle_load_session(session_id: str, state: dict,
         console.print(f"[bold green]会话已恢复: {session_id}[/bold green]")
     else:
         console.print(f"[bold red]会话未找到: {session_id}[/bold red]")
+
+
+async def handle_show_sop_picker(sop_picker_state: dict, state: dict,
+                                  resources, status_data: dict, app, console) -> None:
+    """处理 /sops：打开多选 SOP 选择器，确认后更新 state['sop_ids']。"""
+    # 从 CSV 构建 SOP 列表
+    sops = []
+    for _, row in resources.sops_df.iterrows():
+        sops.append({
+            "sop_id": row["SOP_ID"],
+            "objective": row["Objective"],
+            "description": row.get("Description", ""),
+        })
+
+    current_ids = set(state.get("sop_ids", []))
+
+    from repl.sop_picker import activate_sop_picker, deactivate_sop_picker
+    activate_sop_picker(sop_picker_state, sops, current_ids)
+    app.invalidate()
+
+    await sop_picker_state["result_event"].wait()
+    result = deactivate_sop_picker(sop_picker_state)
+    app.invalidate()
+
+    if result.get("action") == "confirm":
+        state["sop_ids"] = sorted(result.get("selected_ids", []))
+        console.print(f"[bold green]SOP 配置已更新[/bold green]")
+        console.print(f"[dim]活跃 SOP: {', '.join(state['sop_ids']) or '(无)'}[/dim]")
+    else:
+        console.print("[dim]SOP 配置未更改。[/dim]")

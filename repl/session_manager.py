@@ -7,7 +7,7 @@ SESSIONS_DIR = "user/sessions"
 SESSION_FIELDS = (
     "session_id", "session_name",
     "conversation_history", "execution_history",
-    "current_dialogue", "sop_library_text",
+    "current_dialogue", "sop_ids",
     "created_at",
 )
 
@@ -51,7 +51,7 @@ def save_session(state: dict) -> str | None:
             "conversation_history": state.get("conversation_history", ""),
             "execution_history": state.get("execution_history", ""),
             "current_dialogue": state.get("current_dialogue", ""),
-            "sop_library_text": state.get("sop_library_text", ""),
+            "sop_ids": state.get("sop_ids", []),
         }
 
         filepath = f"{SESSIONS_DIR}/{session_id}.json"
@@ -73,6 +73,14 @@ def load_session(session_id: str) -> dict | None:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
 
+        # 向后兼容：旧会话存储 sop_library_text 而非 sop_ids
+        sop_ids = data.get("sop_ids", [])
+        if not sop_ids and "sop_library_text" in data:
+            sop_ids = []
+            for line in data["sop_library_text"].strip().split("\n"):
+                if "|" in line:
+                    sop_ids.append(line.split("|")[0].strip())
+
         # 提取恢复所需字段
         return {
             "session_id": data.get("session_id", session_id),
@@ -81,7 +89,7 @@ def load_session(session_id: str) -> dict | None:
             "conversation_history": data.get("conversation_history", ""),
             "execution_history": data.get("execution_history", ""),
             "current_dialogue": data.get("current_dialogue", ""),
-            "sop_library_text": data.get("sop_library_text", ""),
+            "sop_ids": sop_ids,
         }
     except FileNotFoundError:
         return None

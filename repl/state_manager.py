@@ -1,12 +1,12 @@
 def create_initial_state(user_query: str, session_dir: str,
-                           sop_library_text: str) -> dict:
+                           sop_ids: list[str]) -> dict:
     """创建初始 state，包含所有 REPL 键。"""
     return {
         "user_instruction": user_query,
         "session_dir": session_dir,
         "session_id": "",
         "session_name": "",
-        "sop_library_text": sop_library_text,
+        "sop_ids": sop_ids,
 
         "matched_sop_id": "",
         "sop_objective": "",

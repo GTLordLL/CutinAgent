@@ -17,7 +17,9 @@ def initial_sop_retriever_node(resources):
         t_start = time.time()
         round_num = state.get("current_round", 0)
         user_instruction = state["user_instruction"]
-        sop_library = state.get("sop_library_text", "")
+        from utils.sop_loader import build_sop_library_from_ids
+        sop_ids = state.get("sop_ids", [])
+        sop_library = build_sop_library_from_ids(sops_df, sop_ids)
 
         valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist())
 
