@@ -4,6 +4,7 @@ from parsers.tool_call import _build_tool_signature, _split_parallel_calls
 from validator.SopExecutionSchedulerValidator import validate_tool_call, validate_scheduler_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
+from repl.config_manager import get_config
 
 
 def _parse_multiple_tool_calls(tool_call_raw: str, valid_tool_ids: set) -> list[dict]:
@@ -29,6 +30,8 @@ def sop_execution_scheduler_node(resources):
     _console = Console()
 
     def node(state: dict) -> dict:
+        cfg = get_config()
+        buf_interval = float(cfg["stream_buffer_interval"])
         t_start = time.time()
         round_num = state.get("current_round", 0)
         user_instruction = state.get("user_instruction", "")
@@ -65,7 +68,7 @@ def sop_execution_scheduler_node(resources):
         )
 
         _console.out("  [Scheduler Thinker] ", style="dim")
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0, console=_console, style="dim")
+        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim")
 
         # --- Formatter with retries ---
         max_retries = 3
@@ -89,7 +92,7 @@ def sop_execution_scheduler_node(resources):
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
             _console.out(f"\n  [Scheduler Formatter{retry_label}] ", style="dim")
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0, console=_console, style="dim")
+            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=buf_interval, console=_console, style="dim")
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
 

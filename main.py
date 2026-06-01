@@ -29,6 +29,10 @@ from repl import (
     create_sop_picker_state,
     get_sop_picker_condition,
     create_sop_picker_control,
+    # Config Picker
+    create_config_picker_state,
+    get_config_picker_condition,
+    create_config_picker_control,
     # UI
     print_welcome,
     print_user_message,
@@ -88,18 +92,22 @@ async def run_repl():
     # ── 7. UI 组件 ──────────────────────────────────────────────
     picker_state = create_picker_state()
     sop_picker_state = create_sop_picker_state()
+    config_picker_state = create_config_picker_state()
     input_field = create_input_field(completer=ReplCompleter(), state=state)
     top_status_control, top_status_data = create_top_status_bar()
     status_control, status_data = create_status_bar()
 
     picker_filter = get_picker_condition(picker_state)
     sop_picker_filter = get_sop_picker_condition(sop_picker_state)
+    config_picker_filter = get_config_picker_condition(config_picker_state)
     root = create_root_container(
         input_field, top_status_control, top_status_data, status_control,
         picker_control=create_picker_control(picker_state),
         picker_filter=picker_filter,
         sop_picker_control=create_sop_picker_control(sop_picker_state),
         sop_picker_filter=sop_picker_filter,
+        config_picker_control=create_config_picker_control(config_picker_state),
+        config_picker_filter=config_picker_filter,
     )
     layout = create_layout(root, input_field)
 
@@ -161,6 +169,26 @@ async def run_repl():
                             sop_picker_state, state, resources, status_data,
                             app, console
                         )
+                        return
+
+                    # /config → 全局设置
+                    if msg == CmdSignal.SHOW_CONFIG_PICKER:
+                        from repl.config_picker import (
+                            activate_config_picker, deactivate_config_picker,
+                        )
+                        activate_config_picker(config_picker_state)
+                        app.invalidate()
+
+                        await config_picker_state["result_event"].wait()
+                        result = deactivate_config_picker(config_picker_state)
+                        app.invalidate()
+
+                        if result.get("action") == "save":
+                            print_command_result(console, "设置已保存。")
+                        elif result.get("action") == "reset":
+                            print_command_result(console, "设置已恢复为默认值。")
+                        else:
+                            console.print("[dim]设置未更改。[/dim]")
                         return
 
                     # /compact → 手动压缩
@@ -245,7 +273,9 @@ async def run_repl():
     kb = create_keybindings(
         input_field, flags, confirm_event, confirm_value,
         picker_state, picker_filter,
-        sop_picker_state, sop_picker_filter, _handle_input,
+        sop_picker_state, sop_picker_filter,
+        config_picker_state, config_picker_filter,
+        _handle_input,
     )
 
     app = build_application(layout, kb)

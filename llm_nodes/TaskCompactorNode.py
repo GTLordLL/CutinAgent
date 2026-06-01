@@ -4,6 +4,7 @@ from validator.CompactorValidator import validate_compactor_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
 from repl.dialogue_utils import dialogue_to_text
+from repl.config_manager import get_config
 
 
 def task_compactor_node(resources):
@@ -21,6 +22,8 @@ def task_compactor_node(resources):
     _console = Console()
 
     def compact_task(state: dict) -> dict:
+        cfg = get_config()
+        buf_interval = float(cfg["stream_buffer_interval"])
         t_start = time.time()
         round_num = state.get("current_round", 0)
 
@@ -61,7 +64,7 @@ def task_compactor_node(resources):
         )
 
         _console.out("  [Thinker] ", style="dim")
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0, console=_console, style="dim")
+        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim")
 
         # --- Formatter with retries ---
         max_retries = 3
@@ -80,7 +83,7 @@ def task_compactor_node(resources):
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
             _console.out(f"\n  [Formatter{retry_label}] ", style="dim")
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0, console=_console, style="dim")
+            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=buf_interval, console=_console, style="dim")
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
 

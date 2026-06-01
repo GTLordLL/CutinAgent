@@ -4,6 +4,7 @@ from validator.UserCoordinatorValidator import validate_coordinator_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
 from repl.dialogue_utils import dialogue_to_text
+from repl.config_manager import get_config
 
 
 def user_coordinator_node(resources):
@@ -24,6 +25,8 @@ def user_coordinator_node(resources):
     _console = Console()
 
     def coordinator(state: dict) -> dict:
+        cfg = get_config()
+        buf_interval = float(cfg["stream_buffer_interval"])
         t_start = time.time()
         round_num = state.get("current_round", 0)
 
@@ -50,7 +53,7 @@ def user_coordinator_node(resources):
         )
 
         _console.out("  [Thinker] ", style="dim")
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=2.0, console=_console, style="dim")
+        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim")
 
         # --- Formatter with retries ---
         max_retries = 3

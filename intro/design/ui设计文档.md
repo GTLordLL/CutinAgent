@@ -118,7 +118,7 @@ status_data["token_info"] = token_text.rjust(shutil.get_terminal_size().columns)
                       1,234 (15.1%) tokens     ← FormattedTextControl  状态栏第2行 (token)
 ```
 
-Session Picker 激活时，底部替换为 8 行选择器（详见 4.1 节）。
+任一 Picker 激活时（Session / SOP / Config），底部替换为对应高度的选择器（详见 4.1 / 4.2 节）。
 
 ---
 
@@ -173,6 +173,9 @@ REPL UI 相关代码按运行时角色拆分到 `repl/` 目录：
 | `repl/state_manager.py` | State 创建与重置 | `create_initial_state`, `reset_sop_state` |
 | `repl/session_manager.py` | 会话 CRUD + 运行摘要 | `create_session_dir`, `save_session`, `load_session`, `list_sessions`, `write_run_summary` |
 | `repl/session_picker.py` | 会话选择器渲染与交互 | `create_picker_state`, `create_picker_control`, `activate_picker`, `picker_select`, `picker_cancel` 等 |
+| `repl/sop_picker.py` | SOP 多选选择器渲染与交互 | `create_sop_picker_state`, `activate_sop_picker`, `sop_picker_enter`, `sop_picker_cancel` 等 |
+| `repl/config_manager.py` | 运行时全局配置管理（内存级，重启恢复默认） | `get_config`, `apply_config`, `reset_defaults`, `RUNTIME_CONFIG` |
+| `repl/config_picker.py` | 全局设置选择器渲染与数值交互 | `create_config_picker_state`, `activate_config_picker`, `config_picker_enter`, `config_picker_cancel`, `config_picker_adjust` 等 |
 | `utils/streaming.py` | LLM token 流式输出（含 buffer_interval 逻辑） | `stream_llm` |
 
 依赖方向：`main.py` → `repl/*` → `utils/streaming`（编排层依赖基础设施层）。
@@ -203,6 +206,103 @@ REPL UI 相关代码按运行时角色拆分到 `repl/` 目录：
 | Esc | `picker_cancel` | 取消选择，设置 `result_event` |
 
 所有 picker 按键绑定的 `filter` 参数设为 `picker_filter & has_focus(input_field)`（方向键为 `picker_filter`），确保仅在选择器激活时生效，不影响正常 REPL 输入。
+
+**多选择器互斥机制**：
+
+`create_root_container()` 构建 `any_picker` 复合过滤器，协调三种选择器的显示互斥：
+
+```python
+# app_builder.py — 动态构建 any_picker 过滤器
+any_picker = None
+for f in [picker_filter, sop_picker_filter, config_picker_filter]:
+    if f is not None:
+        any_picker = f if any_picker is None else any_picker | f
+```
+
+底部状态栏使用 `filter=~any_picker` 控制显示——任一选择器激活时，状态栏（height=2，含 token 信息行）自动隐藏。三种选择器分别通过各自独立的 `ConditionalContainer` + `filter` 控制显示，通过 `any_picker` 确保三者互斥（同一时刻只有一个选择器可见）。
+
+### 4.2 全局设置选择器覆盖机制
+
+`/config` 触发时，配置选择器通过 `ConditionalContainer` 条件覆盖底部状态栏。布局切换机制与 4.1 节相同：`any_picker` 复合过滤器确保所有三种选择器互斥。
+
+**选择器 UI 布局（8 行）**：
+
+```
+  ─────────────────────
+    输入区域 (TextArea)
+  ─────────────────────
+  全局设置
+
+  > 自动压缩阈值     4096 tokens  ← →
+    流式缓冲间隔        2 s        ← →
+    输入栏最大行数     10 行       ← →
+
+     [ 保存 ]      [ 恢复默认 ]
+
+  ↑ ↓ 选择  ← → 调整  Enter 保存  Esc 取消
+```
+
+**与会话选择器的键位差异**：
+
+会话选择器用 ← → 翻页，配置选择器用 ← → 调整当前设置项的数值。两种选择器通过各自独立的 filter 条件隔离，同时激活时互不干扰（`any_picker` 保证了互斥）。
+
+**键位绑定（config picker 激活时）**：
+
+| 按键 | 设置行 (index 0-2) | 保存按钮 (index 3) | 恢复默认按钮 (index 4) |
+|------|-------------------|--------------------|-----------------------|
+| ↑ | 上移选中项 | 上移选中项 | 上移选中项 |
+| ↓ | 下移选中项 | 下移选中项 | 下移选中项 |
+| ← | 按 step 减少 | — | — |
+| → | 按 step 增加 | — | — |
+| Enter | 忽略（no-op） | 保存并关闭 | 恢复默认并关闭 |
+| Esc | 取消（关闭且不保存） | 取消 | 取消 |
+
+所有 config picker 按键的 `filter` 参数设为 `config_picker_filter & has_focus(input_field)`（方向键为 `config_picker_filter`），确保仅在配置选择器激活时生效。
+
+**Copy-on-Activate 模式**：
+
+与会话选择器不同，配置选择器在激活时拷贝 `RUNTIME_CONFIG` 到临时值 `temp_values`，用户的所有调整操作只修改 `temp_values`，不影响运行中的实际配置。保存时才写回 `RUNTIME_CONFIG`，取消则丢弃 `temp_values`。
+
+```python
+# 激活时：拷贝 RUNTIME_CONFIG → temp_values
+def activate_config_picker(state: dict):
+    state["temp_values"] = dict(get_config())  # 浅拷贝所有值
+    state["selected_index"] = 0
+    state["result"] = {}
+    state["result_event"].clear()
+    state["active"] = True
+
+# ← → 调整：修改 temp_values（不影响 RUNTIME_CONFIG）
+def config_picker_adjust(state: dict, direction: str):
+    setting = SETTINGS[state["selected_index"]]
+    delta = setting["step"] * (-1 if direction == "left" else 1)
+    new_val = state["temp_values"][setting["key"]] + delta
+    state["temp_values"][setting["key"]] = max(setting["min"], min(setting["max"], new_val))
+
+# Enter 在按钮上：
+def config_picker_enter(state: dict):
+    if idx == BUTTON_SAVE:
+        apply_config(state["temp_values"])  # temp_values → RUNTIME_CONFIG
+    elif idx == BUTTON_RESET:
+        reset_defaults()                    # RUNTIME_CONFIG ← _DEFAULTS
+        state["temp_values"] = dict(get_config())  # 同步 temp_values
+    state["result_event"].set()  # 解除 main.py 的 await 阻塞
+
+# Esc：temp_values 丢弃，RUNTIME_CONFIG 保持不变
+def config_picker_cancel(state: dict):
+    state["result"] = {"action": "cancel"}
+    state["result_event"].set()
+```
+
+**可配置项**：
+
+| 设置项 | 内部键 | 默认值 | 范围 | 步长 | 消费方 |
+|--------|--------|--------|------|------|--------|
+| 自动压缩阈值 | `auto_compact_threshold` | 4096 | 1024–8192 | 1024 | `compaction_controller.py` — `try_auto_compact()` 每轮检查 |
+| 流式缓冲间隔 | `stream_buffer_interval` | 2 | 1–60 | 1 | 7 个 LLM 调用点（4 个节点 + 3 个工具），每次调用时重新读取 |
+| 输入栏最大行数 | `input_max_lines` | 10 | 1–20 | 1 | `app_builder.py` — `create_input_field()` 中 `Dimension(max=...)` 初始化时读取 |
+
+> **注意**：`input_max_lines` 是半静态参数——在 `TextArea` 创建时读取一次，运行时 `/config` 修改后不会动态调整已有输入框的高度，重启 REPL 后生效。其余两个参数在每次节点/工具调用时重新读取，修改即时生效。
 
 ---
 
@@ -319,3 +419,7 @@ def _write(text: str):
 | `buffer_interval` | 2.0 | 批量写入间隔（秒） |
 | `console` | None | Rich Console 实例 |
 | `style` | "" | Rich 样式字符串（如 "dim"） |
+
+> **运行时可调**：`buffer_interval` 的默认值（2.0s）可通过 `/config` 命令在运行时调整（`stream_buffer_interval`，范围 1–60s，步长 1s）。修改后所有后续 LLM 调用立即生效，无需重启 REPL。
+>
+> **已知不一致**：`UserCoordinatorNode.py` 第 75 行的 Formatter 调用目前硬编码 `buffer_interval=2.0`（不读取运行时配置），而该文件第 56 行的 Thinker 调用及其他 6 个 LLM 调用点均已接入 `get_config()["stream_buffer_interval"]`。这是一个待修复的不一致——Formatter 的重试场景下，流式间隔由硬编码控制而非用户配置。

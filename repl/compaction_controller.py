@@ -5,6 +5,7 @@
 
 from rich.panel import Panel
 from repl.llm_runner import run_llm_node
+from repl.config_manager import get_config
 
 
 async def run_chat_compactor(chat_compactor_fn, state: dict,
@@ -62,7 +63,8 @@ async def try_auto_compact(state: dict, chat_compactor_fn,
     Returns:
         True 表示执行了自动压缩，False 表示无需压缩
     """
-    if (state.get("thinker_input_tokens", 0) > 4096
+    cfg = get_config()
+    if (state.get("thinker_input_tokens", 0) > cfg["auto_compact_threshold"]
             and len(state.get("current_dialogue", [])) > 0):
         return await run_chat_compactor(
             chat_compactor_fn, state, top_status_data, app, console,

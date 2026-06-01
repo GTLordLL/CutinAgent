@@ -1,6 +1,7 @@
 import os
 from langchain_ollama import ChatOllama
 from utils.streaming import stream_llm
+from repl.config_manager import get_config
 
 _PROMPT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts", "report_generator")
 
@@ -32,8 +33,10 @@ def generate_summary_report(data: str) -> str:
             f"<|im_start|>assistant\n"
         )
 
+        cfg = get_config()
+        buf_interval = float(cfg["stream_buffer_interval"])
         print("  [report_generator] ", end="", flush=True)
-        report, usage = stream_llm(llm, prompt, buffer_interval=2.0)
+        report, usage = stream_llm(llm, prompt, buffer_interval=buf_interval)
         report = str(report).strip()
 
         return {

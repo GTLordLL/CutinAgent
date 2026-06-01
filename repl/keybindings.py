@@ -73,6 +73,8 @@ def create_keybindings(
     picker_filter,
     sop_picker_state: dict = None,
     sop_picker_filter=None,
+    config_picker_state: dict = None,
+    config_picker_filter=None,
     handle_input_coro=None,
 ) -> KeyBindings:
     """创建 Application 的全局按键绑定。
@@ -86,6 +88,8 @@ def create_keybindings(
         picker_filter: picker 激活时的 Condition 过滤器
         sop_picker_state: SOP 选择器状态 dict（可选）
         sop_picker_filter: SOP picker 激活时的 Condition 过滤器（可选）
+        config_picker_state: 全局设置选择器状态 dict（可选）
+        config_picker_filter: config picker 激活时的 Condition 过滤器（可选）
         handle_input_coro: async 回调，接收用户输入文本，签名 (text: str) -> awaitable
 
     Returns:
@@ -134,6 +138,8 @@ def create_keybindings(
         _hist_filter = _hist_filter & ~picker_filter
     if sop_picker_filter is not None:
         _hist_filter = _hist_filter & ~sop_picker_filter
+    if config_picker_filter is not None:
+        _hist_filter = _hist_filter & ~config_picker_filter
 
     @kb.add("up", filter=_hist_filter)
     def _on_history_up(event):
@@ -218,6 +224,45 @@ def create_keybindings(
         @kb.add("right", filter=sop_picker_filter)
         def _on_sop_picker_right(event):
             sop_picker_page_right(sop_picker_state)
+            event.app.invalidate()
+
+    # ── 全局设置选择器按键：仅在 config picker 激活时生效 ──
+    if config_picker_state is not None and config_picker_filter is not None:
+        from repl.config_picker import (
+            config_picker_enter, config_picker_cancel,
+            config_picker_move_up, config_picker_move_down,
+            config_picker_adjust,
+        )
+
+        @kb.add("enter", filter=config_picker_filter & has_focus(input_field))
+        def _on_config_picker_enter(event):
+            input_field.buffer.text = ""
+            config_picker_enter(config_picker_state)
+            event.app.invalidate()
+
+        @kb.add("escape", filter=config_picker_filter & has_focus(input_field))
+        def _on_config_picker_escape(event):
+            config_picker_cancel(config_picker_state)
+            event.app.invalidate()
+
+        @kb.add("up", filter=config_picker_filter)
+        def _on_config_picker_up(event):
+            config_picker_move_up(config_picker_state)
+            event.app.invalidate()
+
+        @kb.add("down", filter=config_picker_filter)
+        def _on_config_picker_down(event):
+            config_picker_move_down(config_picker_state)
+            event.app.invalidate()
+
+        @kb.add("left", filter=config_picker_filter)
+        def _on_config_picker_left(event):
+            config_picker_adjust(config_picker_state, direction="left")
+            event.app.invalidate()
+
+        @kb.add("right", filter=config_picker_filter)
+        def _on_config_picker_right(event):
+            config_picker_adjust(config_picker_state, direction="right")
             event.app.invalidate()
 
     return kb

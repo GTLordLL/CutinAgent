@@ -12,6 +12,8 @@ from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.history import History
 from prompt_toolkit.completion import Completer
 
+from repl.config_manager import get_config
+
 
 class DialogueHistory(History):
     """从 current_dialogue 列表中提取用户消息作为输入历史。
@@ -52,12 +54,13 @@ def create_input_field(completer: Completer | None = None,
     """
     history = DialogueHistory(state) if state is not None else None
 
+    cfg = get_config()
     ta = TextArea(
         text="",
         multiline=True,
         wrap_lines=True,
         dont_extend_height=True,
-        height=Dimension(min=1, max=10),
+        height=Dimension(min=1, max=cfg["input_max_lines"]),
         prompt="> ",
         history=history,
         completer=completer,
@@ -109,7 +112,9 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
                          picker_control: FormattedTextControl = None,
                          picker_filter=None,
                          sop_picker_control: FormattedTextControl = None,
-                         sop_picker_filter=None) -> HSplit:
+                         sop_picker_filter=None,
+                         config_picker_control: FormattedTextControl = None,
+                         config_picker_filter=None) -> HSplit:
     """构建 HSplit 布局，顶部状态栏动态高度。
 
     布局结构（从上到下）：
@@ -123,16 +128,15 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
 
     has_picker = picker_control is not None and picker_filter is not None
     has_sop_picker = sop_picker_control is not None and sop_picker_filter is not None
+    has_config_picker = config_picker_control is not None and config_picker_filter is not None
 
     # 底部区域：正常状态栏与选择器条件切换（互斥）
-    if has_picker or has_sop_picker:
+    if has_picker or has_sop_picker or has_config_picker:
         # 构建 "任一选择器活跃" 的组合过滤器
-        if has_picker and has_sop_picker:
-            any_picker = picker_filter | sop_picker_filter
-        elif has_picker:
-            any_picker = picker_filter
-        else:
-            any_picker = sop_picker_filter
+        any_picker = None
+        for f in [picker_filter, sop_picker_filter, config_picker_filter]:
+            if f is not None:
+                any_picker = f if any_picker is None else any_picker | f
 
         bottom_elements = [
             Window(height=1, char="─"),
@@ -154,6 +158,14 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
                 ConditionalContainer(
                     content=Window(content=sop_picker_control, height=SOP_PICKER_HEIGHT, style="class:status"),
                     filter=sop_picker_filter,
+                ),
+            )
+        if has_config_picker:
+            from repl.config_picker import CONFIG_PICKER_HEIGHT
+            bottom_elements.append(
+                ConditionalContainer(
+                    content=Window(content=config_picker_control, height=CONFIG_PICKER_HEIGHT, style="class:status"),
+                    filter=config_picker_filter,
                 ),
             )
     else:

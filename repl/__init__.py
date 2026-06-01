@@ -64,6 +64,20 @@ from repl.session_controller import (
 )
 from repl.execution_controller import execute_sop_flow
 from repl.keybindings import create_keybindings
+from repl.config_manager import get_config, reset_defaults, apply_config
+from repl.config_picker import (
+    create_config_picker_state,
+    get_config_picker_condition,
+    create_config_picker_control,
+    activate_config_picker,
+    deactivate_config_picker,
+    config_picker_enter,
+    config_picker_cancel,
+    config_picker_move_up,
+    config_picker_move_down,
+    config_picker_adjust,
+    CONFIG_PICKER_HEIGHT,
+)
 
 __all__ = [
     "dispatch_repl_command",
@@ -127,6 +141,20 @@ __all__ = [
     "handle_show_sop_picker",
     "execute_sop_flow",
     "create_keybindings",
+    "get_config",
+    "reset_defaults",
+    "apply_config",
+    "create_config_picker_state",
+    "get_config_picker_condition",
+    "create_config_picker_control",
+    "activate_config_picker",
+    "deactivate_config_picker",
+    "config_picker_enter",
+    "config_picker_cancel",
+    "config_picker_move_up",
+    "config_picker_move_down",
+    "config_picker_adjust",
+    "CONFIG_PICKER_HEIGHT",
 ]
 
 # 向后兼容别名 — main.py 迁移后可移除
