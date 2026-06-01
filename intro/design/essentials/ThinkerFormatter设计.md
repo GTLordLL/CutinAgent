@@ -2,20 +2,21 @@
 
 ## 做了什么
 
-CutinAgent 的全部 3 个 LLM 节点（UserCoordinator、SopExecutionScheduler、Compactor）统一采用 Thinker + Formatter 双阶段推理模式，每个节点的实现结构完全一致。
+CutinAgent 的全部 4 个 LLM 节点（UserCoordinator、SopExecutionScheduler、TaskCompactor、ChatCompactor）统一采用 Thinker + Formatter 双阶段推理模式，每个节点的实现结构完全一致。
 
 ### 温度不对称
 
-`config/model_config.json` 中定义了 4 个 LLM 配置项，全部使用同一个基础模型 `qwen3:4b-instruct_q8_8k`，仅采样参数不同：
+`config/model_config.json` 中定义了 5 个 LLM 配置项，全部使用同一个基础模型 `qwen3:4b-instruct_q8_8k`，仅采样参数不同：
 
 | 配置项 | temperature | top_p | top_k | num_predict | 使用者 |
 |--------|------------|-------|-------|-------------|--------|
 | `user_coordinator_thinker` | 0.4 | 0.9 | 20 | 4096 | UserCoordinator Thinker |
-| `compactor_thinker` | 0.4 | 0.9 | 20 | 4096 | Compactor Thinker |
+| `compactor_thinker` | 0.4 | 0.9 | 20 | 4096 | TaskCompactor Thinker |
+| `chat_compactor_thinker` | 0.4 | 0.9 | 20 | 4096 | ChatCompactor Thinker |
 | `sop_execution_scheduler_thinker` | 0.4 | 0.9 | 20 | 4096 | Scheduler Thinker |
-| `all_formatter` | 0.0 | 0.1 | 20 | 4096 | **全部 3 个节点的 Formatter** |
+| `all_formatter` | 0.0 | 0.1 | 20 | 4096 | **全部 4 个节点的 Formatter** |
 
-三个 Thinker 各有独立的 LLM 实例（相同参数但独立创建），但**所有 Formatter 共享同一个 `all_formatter` 实例**。每个节点在闭包工厂创建时通过 `resources.get_llm()` 获取对应的 LLM 实例——Thinker 用各自的 thinker 配置名，Formatter 统一用 `"all_formatter"`。
+四个 Thinker 各有独立的 LLM 实例（相同参数但独立创建），但**所有 Formatter 共享同一个 `all_formatter` 实例**。每个节点在闭包工厂创建时通过 `resources.get_llm()` 获取对应的 LLM 实例——Thinker 用各自的 thinker 配置名，Formatter 统一用 `"all_formatter"`。
 
 ### Thinker 阶段（温度 0.4）
 
@@ -94,7 +95,7 @@ top_p 配合温度：Thinker 的 top_p=0.9 保留了长尾可能性以处理边�
 
 ### 所有 Formatter 共享单一实例的理由
 
-三个 Formatter 使用相同的 `all_formatter`，因为它们做的是**同一件事**：从文本中提取结构化字段。无论是从 UserCoordinator Thinker 提取五字段，还是从 Scheduler Thinker 提取工具调用三元组，还是从 Compactor Thinker 提取三字段——任务本质都是"读取文本 → 输出字段 → 不加入新信息"。相同的 model、temperature、top_p 适用于所有三个 Formatter。分开配置不会提升准确率，只会增加配置复杂度。
+四个 Formatter 使用相同的 `all_formatter`，因为它们做的是**同一件事**：从文本中提取结构化字段。无论是从 UserCoordinator Thinker 提取五字段，还是从 Scheduler Thinker 提取工具调用三元组，还是从 TaskCompactor Thinker 提取三字段，还是从 ChatCompactor Thinker 提取单字段——任务本质都是"读取文本 → 输出字段 → 不加入新信息"。相同的 model、temperature、top_p 适用于所有四个 Formatter。分开配置不会提升准确率，只会增加配置复杂度。
 
 ---
 

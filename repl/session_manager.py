@@ -18,7 +18,7 @@ def _get_sessions_dir() -> str:
     return SESSIONS_DIR
 
 
-def _generate_session_id() -> str:
+def generate_session_id() -> str:
     """生成 12 位 hex 会话 ID。"""
     return uuid.uuid4().hex[:12]
 
@@ -41,7 +41,7 @@ def save_session(state: dict) -> str | None:
     """
     try:
         _get_sessions_dir()
-        session_id = state.get("session_id", "") or _generate_session_id()
+        session_id = state.get("session_id", "") or generate_session_id()
         session_name = state.get("session_name", "") or "Unnamed"
 
         data = {
@@ -59,8 +59,7 @@ def save_session(state: dict) -> str | None:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         return session_id
-    except Exception as e:
-        print(f"[bold red]保存会话失败: {e}[/bold red]")
+    except Exception:
         return None
 
 
@@ -85,13 +84,10 @@ def load_session(session_id: str) -> dict | None:
             "sop_library_text": data.get("sop_library_text", ""),
         }
     except FileNotFoundError:
-        print(f"[bold red]会话未找到: {session_id}[/bold red]")
         return None
     except json.JSONDecodeError:
-        print(f"[bold red]会话文件已损坏: {session_id}[/bold red]")
         return None
-    except Exception as e:
-        print(f"[bold red]加载会话失败: {e}[/bold red]")
+    except Exception:
         return None
 
 
@@ -136,8 +132,7 @@ def delete_session(session_id: str) -> bool:
         return True
     except FileNotFoundError:
         return False
-    except Exception as e:
-        print(f"[bold red]删除会话失败: {e}[/bold red]")
+    except Exception:
         return False
 
 

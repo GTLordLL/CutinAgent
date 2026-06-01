@@ -3,6 +3,17 @@ from prompt_toolkit.completion import Completer, Completion
 REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/resume", "/exit", "/quit"]
 
 
+class CmdSignal:
+    """命令分发信号常量，替代魔法字符串。
+
+    dispatch_repl_command 返回的 msg 与这些常量比较，
+    调用方（main.py）据此执行具体操作。
+    """
+    NEW_SESSION = "new_session"
+    SHOW_PICKER = "show_picker"
+    LOAD_SESSION_PREFIX = "load_session:"
+
+
 class ReplCompleter(Completer):
     """Tab 补全 / 前缀命令。"""
     def get_completions(self, document, complete_event):
@@ -13,7 +24,48 @@ class ReplCompleter(Completer):
                     yield Completion(cmd, start_position=-len(text))
 
 
-def build_help_message(resources) -> str:
+def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
+    """处理 / 前缀命令。返回 (handled, message, should_exit)。"""
+    cmd = cmd.strip()
+    if not cmd.startswith("/"):
+        return False, None, False
+
+    parts = cmd.split(maxsplit=1)
+    name = parts[0].lower()
+
+    if name in ("/exit", "/quit"):
+        return True, "", True
+
+    if name == "/help":
+        return True, _build_help_message(resources), False
+
+    if name == "/sops":
+        lines = ["# 可用 SOP 列表", ""]
+        for line in resources.sop_library_text.strip().split("\n"):
+            lines.append(f"- {line}")
+        return True, "\n".join(lines), False
+
+    if name == "/clear":
+        return True, CmdSignal.NEW_SESSION, False
+
+    if name == "/history":
+        return True, _build_history_message(state), False
+
+    if name == "/resume":
+        if len(parts) > 1:
+            return True, f"{CmdSignal.LOAD_SESSION_PREFIX}{parts[1]}", False
+        return True, CmdSignal.SHOW_PICKER, False
+
+    if name == "/compact":
+        requirement = " ".join(parts[1:]) if len(parts) > 1 else ""
+        state["chat_compact_requirement"] = requirement
+        return True, "正在压缩对话上下文...", False
+
+    # 未知 / 命令 — 交给 UserCoordinator 当作普通消息
+    return False, None, False
+
+
+def _build_help_message(resources) -> str:
     """构建 /help 信息（Markdown 格式）。"""
     lines = [
         "# CutinAgent REPL 命令列表",
@@ -36,7 +88,7 @@ def build_help_message(resources) -> str:
     return "\n".join(lines)
 
 
-def build_history_message(state: dict) -> str:
+def _build_history_message(state: dict) -> str:
     """构建 /history 信息（Markdown 格式）。"""
     lines = ["# 当前会话状态"]
     ch = state.get("conversation_history", "")
@@ -46,46 +98,3 @@ def build_history_message(state: dict) -> str:
     lines.append(f"\n## 执行历史\n\n{eh if eh else '(空)'}")
     lines.append(f"\n## 当前对话\n\n{cd if cd else '(空)'}")
     return "\n".join(lines)
-
-
-def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
-    """处理 / 前缀命令。返回 (handled, message, should_exit)。"""
-    cmd = cmd.strip()
-    if not cmd.startswith("/"):
-        return False, None, False
-
-    parts = cmd.split(maxsplit=1)
-    name = parts[0].lower()
-
-    if name in ("/exit", "/quit"):
-        return True, "", True
-
-    if name == "/help":
-        return True, build_help_message(resources), False
-
-    if name == "/sops":
-        lines = ["# 可用 SOP 列表", ""]
-        for line in resources.sop_library_text.strip().split("\n"):
-            lines.append(f"- {line}")
-        return True, "\n".join(lines), False
-
-    if name == "/clear":
-        # 信号通知 main.py 保存旧会话并创建新会话
-        return True, "new_session", False
-
-    if name == "/history":
-        return True, build_history_message(state), False
-
-    if name == "/resume":
-        # /resume [session_id] — 直接加载或打开选择器
-        if len(parts) > 1:
-            return True, f"load_session:{parts[1]}", False
-        return True, "show_picker", False
-
-    if name == "/compact":
-        requirement = " ".join(parts[1:]) if len(parts) > 1 else ""
-        state["chat_compact_requirement"] = requirement
-        return True, "正在压缩对话上下文...", False
-
-    # 未知 / 命令 — 交给 UserCoordinator 当作普通消息
-    return False, None, False

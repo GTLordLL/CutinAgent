@@ -46,6 +46,80 @@ flush。buffer_interval=2.0 把写入频率从 ~100次/秒 降到 ~0.5次/秒，
 
 Application 只占底部 5 行，其余终端区域供 Rich 输出自由使用。
 
+### 2.3 顶部运行时状态栏
+
+在执行 LLM 调用（UserCoordinator、ChatCompactor、SOP 图）期间，顶部动态显示实时耗时：
+
+```
+  UserCoordinator: 12s                                     ← 有运行时 → height=3
+────────────────────────────────────────                    ← Window(char="─")
+  > [用户输入区域]                                           ← TextArea
+────────────────────────────────────────
+  CutinAgent REPL — /help 查看命令                           ← 状态栏
+```
+
+**实现机制**：
+
+- `top_status_data = {"runtime_text": ""}` — 可变字典，`FormattedTextControl` 通过闭包 lambda 引用
+- `has_runtime = Condition(lambda: bool(top_status_data.get("runtime_text", "")))` — 动态控制高度
+- 有运行时文本 → `ConditionalContainer` 显示 height=3 的状态行
+- 无运行时文本 → `ConditionalContainer` 替换为 height=1 的空行
+- 后台定时器（`_runtime_timer`）每 0.5s 更新一次 `runtime_text` 并调用 `app.invalidate()` 刷新
+
+**计时器生命周期**：
+
+```python
+async def _runtime_timer(label, start_time, stop_event):
+    while not stop_event.is_set():
+        top_status_data["runtime_text"] = f"  {label}: {_fmt_elapsed(elapsed)}"
+        app.invalidate()
+        await asyncio.wait_for(stop_event.wait(), timeout=0.5)
+```
+
+LLM 调用完成后 → `stop_event.set()` → 定时器退出 → `runtime_text` 清空 → 顶部栏缩回 1 行空白。
+
+### 2.4 Token 用量显示
+
+底部状态栏第二行显示当前 Thinker 输入 token 数及占 8K 窗口的百分比：
+
+```
+────────────────────────────────────────
+  CutinAgent REPL — /help 查看命令
+                      1,234 (15.1%) tokens                      ← 右对齐
+```
+
+**实现机制**：
+
+- `status_data["token_info"]` 字段存储格式化的 token 信息
+- UserCoordinator 每轮返回后更新：
+
+```python
+input_tokens = state.get("thinker_input_tokens", 0)
+ratio = (input_tokens / 8192) * 100
+token_text = f"{input_tokens:,} ({ratio:.1f}%) tokens  "
+status_data["token_info"] = token_text.rjust(shutil.get_terminal_size().columns)
+```
+
+- 右对齐使用 `str.rjust()` 填充到终端宽度，确保 token 数字始终在右下角
+- `/clear` 和 `/resume` 恢复会话时将 token 显示重置为 `"0 (0.0%) tokens"`
+
+### 2.5 布局结构（完整）
+
+包含顶部运行时状态栏 + 两行底部状态栏的完整布局：
+
+```
+                                              ← Window(char=" ")      空行（顶部间距）
+  UserCoordinator: 12s                        ← 运行时状态 (height=3)  仅 LLM 执行时显示
+                                              ← Window(char=" ")      空行
+────────────────────────────────────────      ← Window(char="─")      顶部分隔线
+  > [用户输入区域]                             ← TextArea              用户输入
+────────────────────────────────────────      ← Window(char="─")      底部分隔线
+  CutinAgent REPL — /help 查看命令             ← FormattedTextControl  状态栏第1行
+                      1,234 (15.1%) tokens     ← FormattedTextControl  状态栏第2行 (token)
+```
+
+Session Picker 激活时，底部替换为 8 行选择器（详见 4.1 节）。
+
 ---
 
 ## 3. Rich 样式体系
@@ -97,10 +171,38 @@ REPL UI 相关代码按运行时角色拆分到 `repl/` 目录：
 | `repl/command_handler.py` | 命令分发 + Tab 补全 | `dispatch_repl_command`, `ReplCompleter` |
 | `repl/sop_runner.py` | SOP 图执行 + 节点 Panel 渲染 | `run_sop_graph` |
 | `repl/state_manager.py` | State 创建与重置 | `create_initial_state`, `reset_sop_state` |
-| `repl/session_manager.py` | 会话目录 + 运行摘要 | `create_session_dir`, `write_run_summary` |
+| `repl/session_manager.py` | 会话 CRUD + 运行摘要 | `create_session_dir`, `save_session`, `load_session`, `list_sessions`, `write_run_summary` |
+| `repl/session_picker.py` | 会话选择器渲染与交互 | `create_picker_state`, `create_picker_control`, `activate_picker`, `picker_select`, `picker_cancel` 等 |
 | `utils/streaming.py` | LLM token 流式输出（含 buffer_interval 逻辑） | `stream_llm` |
 
 依赖方向：`main.py` → `repl/*` → `utils/streaming`（编排层依赖基础设施层）。
+
+### 4.1 会话选择器覆盖机制
+
+`/resume`（无参数）触发时，会话选择器通过 `ConditionalContainer` 条件覆盖底部状态栏：
+
+```
+正常状态：                    选择器激活（picker_filter=True）：
+  ─────────────────────           ─────────────────────
+    输入区域 (TextArea)              输入区域 (TextArea)
+  ─────────────────────           ─────────────────────
+    状态栏 (height=2)        →      会话选择器 (height=8)
+    [第1行]  [第2行]                 会话列表 (每页5条)
+                                     ← → 上下 翻页/选择
+```
+
+**键位绑定（picker 激活时）**：
+
+| 按键 | 操作 | 说明 |
+|------|------|------|
+| ↑ | `picker_move_up` | 上移高亮项 |
+| ↓ | `picker_move_down` | 下移高亮项 |
+| ← | `picker_page_left` | 翻到上一页 |
+| → | `picker_page_right` | 翻到下一页 |
+| Enter | `picker_select` | 确认选择，设置 `result_event` |
+| Esc | `picker_cancel` | 取消选择，设置 `result_event` |
+
+所有 picker 按键绑定的 `filter` 参数设为 `picker_filter & has_focus(input_field)`（方向键为 `picker_filter`），确保仅在选择器激活时生效，不影响正常 REPL 输入。
 
 ---
 

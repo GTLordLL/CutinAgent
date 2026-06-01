@@ -1,8 +1,25 @@
 # Compactor — 执行评价与历史压缩
 
+## TaskCompactor 与 ChatCompactor 的区分
+
+CutinAgent 有两个 Compactor，各司其职：
+
+| 维度 | **TaskCompactor**（本文档主题） | **ChatCompactor** |
+|------|-------------------------------|-------------------|
+| **触发时机** | 每次 SOP 执行完成后 | 手动 `/compact` 或 token > 4096 自动触发 |
+| **压缩对象** | 本次 SOP 执行结果 + 本轮对话 | 当前对话缓冲区（`current_dialogue`） |
+| **输出字段** | 3 字段：EVALUATION + CONVERSATION_SUMMARY + EXECUTION_SUMMARY | 1 字段：CONVERSATION_SUMMARY |
+| **输入上下文** | 7 项完整上下文快照（含执行结果） | 4 项对话上下文（无执行状态） |
+| **Validator** | `CompactorValidator`（三字段校验） | `ChatCompactorValidator`（单字段校验） |
+| **输出写入** | `conversation_history` + `execution_history` | 仅 `conversation_history` |
+
+> **两者都是闭包工厂，不注册为 LangGraph 图节点。** 关注的是"跨 SOP 周期"的信息管理，不受图执行循环约束。ChatCompactor 详见 [ChatCompactor设计.md](ChatCompactor设计.md)。
+
+---
+
 ## 做了什么
 
-Compactor 是每次 SOP 执行完毕后运行的 LLM 节点，负责**评价执行结果 + 压缩历史**。它不在 LangGraph 执行图中（不是 `graph/Builder.py` 注册的节点），而是由 `main.py` 的 REPL 循环在 SOP 图执行完成后直接调用。
+Compactor（即 TaskCompactor，下同）是每次 SOP 执行完毕后运行的 LLM 节点，负责**评价执行结果 + 压缩历史**。它不在 LangGraph 执行图中（不是 `graph/Builder.py` 注册的节点），而是由 `main.py` 的 REPL 循环在 SOP 图执行完成后直接调用。
 
 ### 闭包工厂，不注册为图节点
 

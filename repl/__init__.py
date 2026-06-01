@@ -1,4 +1,4 @@
-from repl.command_handler import dispatch_repl_command, ReplCompleter, REPL_COMMANDS
+from repl.command_handler import dispatch_repl_command, ReplCompleter, REPL_COMMANDS, CmdSignal
 from repl.state_manager import create_initial_state, reset_sop_state
 from repl.session_manager import (
     create_session_dir,
@@ -7,7 +7,7 @@ from repl.session_manager import (
     load_session,
     list_sessions,
     delete_session,
-    _generate_session_id,
+    generate_session_id,
 )
 from repl.sop_runner import run_sop_graph
 from repl.ui_renderer import (
@@ -37,11 +37,23 @@ from repl.session_picker import (
     picker_select,
     picker_cancel,
 )
+from repl.llm_runner import run_llm_node, fmt_elapsed
+from repl.compaction_controller import run_chat_compactor, try_auto_compact
+from repl.session_controller import (
+    save_current_if_dirty,
+    restore_session_fields,
+    handle_new_session,
+    handle_show_picker,
+    handle_load_session,
+)
+from repl.execution_controller import execute_sop_flow
+from repl.keybindings import create_keybindings
 
 __all__ = [
     "dispatch_repl_command",
     "ReplCompleter",
     "REPL_COMMANDS",
+    "CmdSignal",
     "create_initial_state",
     "reset_sop_state",
     "create_session_dir",
@@ -50,7 +62,7 @@ __all__ = [
     "load_session",
     "list_sessions",
     "delete_session",
-    "_generate_session_id",
+    "generate_session_id",
     "run_sop_graph",
     "print_welcome",
     "print_user_message",
@@ -73,4 +85,18 @@ __all__ = [
     "picker_page_right",
     "picker_select",
     "picker_cancel",
+    "run_llm_node",
+    "fmt_elapsed",
+    "run_chat_compactor",
+    "try_auto_compact",
+    "save_current_if_dirty",
+    "restore_session_fields",
+    "handle_new_session",
+    "handle_show_picker",
+    "handle_load_session",
+    "execute_sop_flow",
+    "create_keybindings",
 ]
+
+# 向后兼容别名 — main.py 迁移后可移除
+_generate_session_id = generate_session_id
