@@ -74,16 +74,51 @@ def create_input_field(completer: Completer | None = None,
 
 
 def create_top_status_bar() -> tuple[FormattedTextControl, dict]:
-    """创建顶部状态栏控件（3行：空白 + 运行时 + 空白）。
+    """创建顶部状态栏控件（3行：空白 + 运行时动画 + 空白）。
+
+    渲染时从 top_status_data["elapsed"] 确定性计算动画帧：
+      - Spinner: "|/-\\" 每 100ms 切换
+      - Dots:    ".  ", ".. ", "..." 每 ~333ms 切换
+      - Color:   6 色渐变循环，每 1s 切换
 
     Returns:
-        (top_status_control, top_status_data): top_status_data["runtime_text"]
-        在执行期间被定时器更新，执行结束后清空。
+        (top_status_control, top_status_data):
+          top_status_data["label"] + ["elapsed"] 在执行期间被定时器更新。
     """
-    top_status_data = {"runtime_text": ""}
+    top_status_data = {
+        "runtime_text": "",   # 保留兼容
+        "label": "",          # 节点名称（非空=运行中）
+        "elapsed": 0.0,       # 当前已用秒数
+    }
+
+    _SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    _DOTS = ["   ", ".  ", ".. ", "..."]
+    _COLORS = [
+        "ansired", "ansiyellow", "ansigreen",
+        "ansicyan", "ansimagenta", "ansiblue",
+    ]
+
+    def _fmt_elapsed(seconds: float) -> str:
+        if seconds >= 60:
+            m = int(seconds // 60)
+            s = int(seconds % 60)
+            return f"{m}m{s}s"
+        return f"{seconds:.0f}s"
 
     def _get_top_status():
-        return f"\n{top_status_data['runtime_text']}\n"
+        label = top_status_data.get("label", "")
+        if not label:
+            return "\n\n"
+
+        elapsed = top_status_data.get("elapsed", 0.0)
+
+        # 确定性动画帧计算（不存 frame counter）
+        spinner_char = _SPINNER[int(elapsed * 10) % len(_SPINNER)]  # 100ms/帧，盲文10帧
+        dots_str = _DOTS[int(elapsed * 3) % 4]                      # ~333ms/帧
+        color = _COLORS[(int(elapsed) // 5) % len(_COLORS)]          # 5s/帧
+
+        line = f" {spinner_char} {label}{dots_str}  {_fmt_elapsed(elapsed)}"
+        return [("", "\n"), (color, line), ("", "\n")]
 
     return FormattedTextControl(_get_top_status), top_status_data
 
@@ -126,7 +161,7 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
         底部分隔线 (height=1, char="─")
         底部状态栏 (height=2) / 选择器 / 命令提示 (height=11)
     """
-    has_runtime = Condition(lambda: bool(top_status_data.get("runtime_text", "")))
+    has_runtime = Condition(lambda: bool(top_status_data.get("label", "")))
 
     has_picker = picker_control is not None and picker_filter is not None
     has_sop_picker = sop_picker_control is not None and sop_picker_filter is not None

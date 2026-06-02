@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict
 import pandas as pd
-from config.load_model_config import load_model_config, get_ollama_url
+from user.config.load_model_config import load_model_config, get_ollama_url
 from utils.load_prompts import load_prompt_file
 from utils.load_csv import load_csv_df
 from utils.sop_loader import load_sop_markdown

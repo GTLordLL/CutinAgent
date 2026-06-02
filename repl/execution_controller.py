@@ -109,14 +109,15 @@ async def execute_sop_flow(
     sop_stop = asyncio.Event()
 
     async def _sop_timer():
-        """单一计时器：覆盖 SOP 执行 + TaskCompactor 全过程。"""
+        """后台定时器：每 0.1s 刷新顶部状态栏动画（spinner + dots + 颜色 + 计时）。"""
         try:
             while not sop_stop.is_set():
                 elapsed = time.time() - sop_start
-                top_status_data["runtime_text"] = f"  SOP: {fmt_elapsed(elapsed)}"
+                top_status_data["label"] = "SOP 执行中"
+                top_status_data["elapsed"] = elapsed
                 app.invalidate()
                 try:
-                    await asyncio.wait_for(sop_stop.wait(), timeout=0.5)
+                    await asyncio.wait_for(sop_stop.wait(), timeout=0.1)
                 except asyncio.TimeoutError:
                     pass
         except asyncio.CancelledError:
@@ -136,7 +137,8 @@ async def execute_sop_flow(
     except Exception as e:
         sop_stop.set()
         await sop_timer_task
-        top_status_data["runtime_text"] = ""
+        top_status_data["label"] = ""
+        top_status_data["elapsed"] = 0
         app.invalidate()
         console.print(f"[bold red]SOP 执行崩溃: {e}[/bold red]")
         import traceback
@@ -165,7 +167,8 @@ async def execute_sop_flow(
     total_elapsed = time.time() - sop_start
     sop_stop.set()
     await sop_timer_task
-    top_status_data["runtime_text"] = ""
+    top_status_data["label"] = ""
+    top_status_data["elapsed"] = 0
     app.invalidate()
     console.print(f"[dim]总耗时 (SOP + TaskCompactor): {fmt_elapsed(total_elapsed)}[/dim]")
 

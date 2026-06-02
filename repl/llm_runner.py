@@ -37,14 +37,15 @@ async def run_llm_node(label: str, node_fn, state: dict,
     stop_event = asyncio.Event()
 
     async def _timer():
-        """后台定时器：每 0.5s 刷新顶部状态栏的实时耗时。"""
+        """后台定时器：每 0.1s 刷新顶部状态栏动画（spinner + dots + 颜色 + 计时）。"""
         try:
             while not stop_event.is_set():
                 elapsed = time.time() - t_start
-                top_status_data["runtime_text"] = f"  {label}: {fmt_elapsed(elapsed)}"
+                top_status_data["label"] = label
+                top_status_data["elapsed"] = elapsed
                 app.invalidate()
                 try:
-                    await asyncio.wait_for(stop_event.wait(), timeout=0.5)
+                    await asyncio.wait_for(stop_event.wait(), timeout=0.1)
                 except asyncio.TimeoutError:
                     pass
         except asyncio.CancelledError:
@@ -57,7 +58,8 @@ async def run_llm_node(label: str, node_fn, state: dict,
     finally:
         stop_event.set()
         await timer_task
-        top_status_data["runtime_text"] = ""
+        top_status_data["label"] = ""
+        top_status_data["elapsed"] = 0
         app.invalidate()
 
     elapsed = time.time() - t_start

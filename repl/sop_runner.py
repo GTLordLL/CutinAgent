@@ -1,5 +1,6 @@
 import time
-from rich.console import Console
+from rich.console import Console, Group
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 from utils.debug_logger import log_state_snapshot
@@ -72,7 +73,22 @@ def run_sop_graph(app, state: dict, console=None) -> tuple[dict, list, str, int,
                     subtitle = node_name
                 else:
                     subtitle = f"{node_name}  [italic]{duration:.2f}s[/italic]"
-                body = Text("\n".join(detail_lines) if detail_lines else "(无输出)", style="")
+
+                # tool_executor: 使用 Markdown 渲染摘要内容
+                tool_summary = output.get("tool_summary", "")
+                if node_name == "tool_executor" and tool_summary:
+                    ts_out = output.get("tool_status", "")
+                    tc = output.get("tool_conclusion", "")
+                    tdv = output.get("tool_detail_var", "")
+                    meta = f"状态: {ts_out}\n结论: {tc}"
+                    if tdv:
+                        meta += f"\n变量: {tdv}"
+                    body = Group(
+                        Text(f"{meta}\n", style=""),
+                        Markdown(tool_summary),
+                    )
+                else:
+                    body = Text("\n".join(detail_lines) if detail_lines else "(无输出)", style="")
                 c.print(Panel(body, title=subtitle, title_align="left", padding=(0, 1)))
 
                 node_outputs.append({

@@ -1,7 +1,7 @@
 import json
 import os
 
-def load_model_config(config_path="./config/model_config.json"):
+def load_model_config(config_path="./user/config/model_config.json"):
     try:
         if not os.path.exists(config_path):
             return None
