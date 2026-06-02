@@ -114,7 +114,9 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
                          sop_picker_control: FormattedTextControl = None,
                          sop_picker_filter=None,
                          config_picker_control: FormattedTextControl = None,
-                         config_picker_filter=None) -> HSplit:
+                         config_picker_filter=None,
+                         command_hint_control: FormattedTextControl = None,
+                         command_hint_filter=None) -> HSplit:
     """构建 HSplit 布局，顶部状态栏动态高度。
 
     布局结构（从上到下）：
@@ -122,19 +124,20 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
         顶部分隔线 (height=1, char="─")
         输入区域 (TextArea)
         底部分隔线 (height=1, char="─")
-        底部状态栏 (height=2) / 会话选择器 (height=8) / SOP选择器 (height=10)
+        底部状态栏 (height=2) / 选择器 / 命令提示 (height=11)
     """
     has_runtime = Condition(lambda: bool(top_status_data.get("runtime_text", "")))
 
     has_picker = picker_control is not None and picker_filter is not None
     has_sop_picker = sop_picker_control is not None and sop_picker_filter is not None
     has_config_picker = config_picker_control is not None and config_picker_filter is not None
+    has_command_hint = command_hint_control is not None and command_hint_filter is not None
 
-    # 底部区域：正常状态栏与选择器条件切换（互斥）
-    if has_picker or has_sop_picker or has_config_picker:
-        # 构建 "任一选择器活跃" 的组合过滤器
+    # 底部区域：正常状态栏与选择器/命令提示条件切换（互斥）
+    if has_picker or has_sop_picker or has_config_picker or has_command_hint:
+        # 构建 "任一覆盖层活跃" 的组合过滤器
         any_picker = None
-        for f in [picker_filter, sop_picker_filter, config_picker_filter]:
+        for f in [picker_filter, sop_picker_filter, config_picker_filter, command_hint_filter]:
             if f is not None:
                 any_picker = f if any_picker is None else any_picker | f
 
@@ -166,6 +169,14 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
                 ConditionalContainer(
                     content=Window(content=config_picker_control, height=CONFIG_PICKER_HEIGHT, style="class:status"),
                     filter=config_picker_filter,
+                ),
+            )
+        if has_command_hint:
+            from repl.command_hint import COMMAND_HINT_HEIGHT
+            bottom_elements.append(
+                ConditionalContainer(
+                    content=Window(content=command_hint_control, height=COMMAND_HINT_HEIGHT, style="class:status"),
+                    filter=command_hint_filter,
                 ),
             )
     else:

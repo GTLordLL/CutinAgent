@@ -78,6 +78,12 @@ from repl.config_picker import (
     config_picker_adjust,
     CONFIG_PICKER_HEIGHT,
 )
+from repl.command_hint import (
+    create_command_hint_state,
+    get_command_hint_condition,
+    create_command_hint_control,
+    COMMAND_HINT_HEIGHT,
+)
 
 __all__ = [
     "dispatch_repl_command",
@@ -155,6 +161,10 @@ __all__ = [
     "config_picker_move_down",
     "config_picker_adjust",
     "CONFIG_PICKER_HEIGHT",
+    "create_command_hint_state",
+    "get_command_hint_condition",
+    "create_command_hint_control",
+    "COMMAND_HINT_HEIGHT",
 ]
 
 # 向后兼容别名 — main.py 迁移后可移除

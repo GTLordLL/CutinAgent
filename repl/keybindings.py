@@ -75,6 +75,8 @@ def create_keybindings(
     sop_picker_filter=None,
     config_picker_state: dict = None,
     config_picker_filter=None,
+    command_hint_state: dict = None,
+    command_hint_filter=None,
     handle_input_coro=None,
 ) -> KeyBindings:
     """创建 Application 的全局按键绑定。
@@ -90,6 +92,8 @@ def create_keybindings(
         sop_picker_filter: SOP picker 激活时的 Condition 过滤器（可选）
         config_picker_state: 全局设置选择器状态 dict（可选）
         config_picker_filter: config picker 激活时的 Condition 过滤器（可选）
+        command_hint_state: 命令提示状态 dict（可选）
+        command_hint_filter: 命令提示激活时的 Condition 过滤器（可选）
         handle_input_coro: async 回调，接收用户输入文本，签名 (text: str) -> awaitable
 
     Returns:
@@ -140,6 +144,8 @@ def create_keybindings(
         _hist_filter = _hist_filter & ~sop_picker_filter
     if config_picker_filter is not None:
         _hist_filter = _hist_filter & ~config_picker_filter
+    if command_hint_filter is not None:
+        _hist_filter = _hist_filter & ~command_hint_filter
 
     @kb.add("up", filter=_hist_filter)
     def _on_history_up(event):
@@ -263,6 +269,33 @@ def create_keybindings(
         @kb.add("right", filter=config_picker_filter)
         def _on_config_picker_right(event):
             config_picker_adjust(config_picker_state, direction="right")
+            event.app.invalidate()
+
+    # ── 命令提示按键：仅在 command hint 激活时生效 ──
+    if command_hint_state is not None and command_hint_filter is not None:
+        from repl.command_hint import (
+            command_hint_move_up, command_hint_move_down,
+            command_hint_dismiss, command_hint_complete,
+        )
+
+        @kb.add("up", filter=command_hint_filter)
+        def _on_cmd_hint_up(event):
+            command_hint_move_up(command_hint_state)
+            event.app.invalidate()
+
+        @kb.add("down", filter=command_hint_filter)
+        def _on_cmd_hint_down(event):
+            command_hint_move_down(command_hint_state)
+            event.app.invalidate()
+
+        @kb.add("escape", filter=command_hint_filter & has_focus(input_field))
+        def _on_cmd_hint_escape(event):
+            command_hint_dismiss(command_hint_state)
+            event.app.invalidate()
+
+        @kb.add("tab", filter=command_hint_filter & has_focus(input_field))
+        def _on_cmd_hint_tab(event):
+            command_hint_complete(command_hint_state, input_field)
             event.app.invalidate()
 
     return kb

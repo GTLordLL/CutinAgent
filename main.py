@@ -19,6 +19,7 @@ from repl import (
     dispatch_repl_command,
     CmdSignal,
     ReplCompleter,
+    REPL_COMMANDS,
     # Session
     create_session_dir,
     generate_session_id,
@@ -33,6 +34,10 @@ from repl import (
     create_config_picker_state,
     get_config_picker_condition,
     create_config_picker_control,
+    # Command Hint
+    create_command_hint_state,
+    get_command_hint_condition,
+    create_command_hint_control,
     # UI
     print_welcome,
     print_user_message,
@@ -93,6 +98,8 @@ async def run_repl():
     picker_state = create_picker_state()
     sop_picker_state = create_sop_picker_state()
     config_picker_state = create_config_picker_state()
+    command_hint_state = create_command_hint_state()
+    command_hint_state["commands"] = REPL_COMMANDS
     input_field = create_input_field(completer=ReplCompleter(), state=state)
     top_status_control, top_status_data = create_top_status_bar()
     status_control, status_data = create_status_bar()
@@ -100,6 +107,8 @@ async def run_repl():
     picker_filter = get_picker_condition(picker_state)
     sop_picker_filter = get_sop_picker_condition(sop_picker_state)
     config_picker_filter = get_config_picker_condition(config_picker_state)
+    command_hint_filter = get_command_hint_condition(command_hint_state, input_field)
+    command_hint_control = create_command_hint_control(command_hint_state, input_field)
     root = create_root_container(
         input_field, top_status_control, top_status_data, status_control,
         picker_control=create_picker_control(picker_state),
@@ -108,6 +117,8 @@ async def run_repl():
         sop_picker_filter=sop_picker_filter,
         config_picker_control=create_config_picker_control(config_picker_state),
         config_picker_filter=config_picker_filter,
+        command_hint_control=command_hint_control,
+        command_hint_filter=command_hint_filter,
     )
     layout = create_layout(root, input_field)
 
@@ -275,6 +286,7 @@ async def run_repl():
         picker_state, picker_filter,
         sop_picker_state, sop_picker_filter,
         config_picker_state, config_picker_filter,
+        command_hint_state, command_hint_filter,
         _handle_input,
     )
 
