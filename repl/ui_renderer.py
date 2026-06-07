@@ -23,7 +23,7 @@ def print_welcome(console: Console):
         "  / /___/ /_/ / / /_  / / / / /  / ___ / /_/ /  __/ / / / / /    \n"
         "  \\____/\\__,_/  |___//_/_/ /_/  /_/  |_\\__, /\\___/_/ /_/ /_/     \n"
         "                                      /____/                     \n"
-        "  https://github.com/GTLordLL/CutinAgent  --  千务小切 v2.0.0     \n"
+        "  https://github.com/GTLordLL/CutinAgent  --  千务小切 v0.1.0\n"
     )
 
     print(sep)

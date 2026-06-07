@@ -9,7 +9,7 @@
 
 ## 架构
 
-v2 采用 **REPL 外层 + LangGraph 执行内层** 双层架构。REPL 提供交互式命令循环（`/help` `/sops` `/history` `/clear` `/exit`，Tab 补全），UserCoordinator 做意图分类与渐进确认，确认后加载 SOP 进入 LangGraph 执行图。所有 LLM 调用支持 token 级流式输出。
+CutinAgent 采用 **REPL 外层 + LangGraph 执行内层** 双层架构。REPL 提供交互式命令循环（`/help` `/sops` `/history` `/clear` `/exit`，Tab 补全），UserCoordinator 做意图分类与渐进确认，确认后加载 SOP 进入 LangGraph 执行图。所有 LLM 调用支持 token 级流式输出。
 
 ## 核心设计
 

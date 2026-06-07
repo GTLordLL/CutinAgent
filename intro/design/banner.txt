@@ -29,7 +29,7 @@ banner层：
   / /___/ /_/ / / /_  / / / / /  / ___ / /_/ /  __/ / / / / /    
   \____/\__,_/  |___//_/_/ /_/  /_/  |_\__, /\___/_/ /_/ /_/    
                                       /____/                     
-  https://github.com/GTLordLL/CutinAgent  --  千务小切 v2.0.0     
+  https://github.com/GTLordLL/CutinAgent  --  千务小切 v0.1.0
 
 
 信息层（承载结构化信息（目录、帮助提示）：

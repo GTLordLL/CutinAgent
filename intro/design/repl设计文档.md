@@ -13,9 +13,10 @@ CutinAgent 采用双层架构：
     │     ├── SopExecutionScheduler (LLM)
     │     ├── ToolExecutor (Data)
     │     └── ProgressUpdater (Data)
-    └── Compactor  ←→  执行评价 + 历史压缩
+    ├── TaskCompactor  ←→  执行评价 + 历史压缩（SOP 执行后）
+    └── ChatCompactor  ←→  对话上下文压缩（手动 /compact 或 token>4096 自动触发）
 
-  UserCoordinator 和 Compactor 不注册为 LangGraph 节点，由 main.py
+  UserCoordinator 和两个 Compactor 不注册为 LangGraph 节点，由 main.py
   REPL 循环直接调用。它们管理"是否执行"和"执行后如何总结"的元决策，
   而 LangGraph 图只负责"如何执行"。
 
@@ -128,7 +129,17 @@ EXECUTION_HISTORY，将用户意图分为三类：
 
 ## 3. Compactor — 执行评价与历史压缩
 
-### 3.1 职责
+CutinAgent 有两个 Compactor，分工管理 4B 模型的 8K 上下文窗口：
+
+| 维度 | **TaskCompactor** | **ChatCompactor** |
+|------|-------------------|-------------------|
+| **触发时机** | 每次 SOP 执行完成后 | 手动 `/compact` 或 token > 4096 自动触发 |
+| **输出字段** | 3 字段：EVALUATION + CONVERSATION_SUMMARY + EXECUTION_SUMMARY | 1 字段：CONVERSATION_SUMMARY |
+| **输出写入** | `conversation_history` + `execution_history` | 仅 `conversation_history` |
+
+> 详细论述见 [Compactor设计.md](essentials/Compactor设计.md) 和 [ChatCompactor设计.md](essentials/ChatCompactor设计.md)。
+
+### 3.1 TaskCompactor 职责
 
   每次 SOP 执行完毕后运行，完成三件事：
     1. 评价：SOP 是否达成了 CURRENT_ACTION 的目标

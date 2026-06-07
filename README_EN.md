@@ -12,7 +12,7 @@ An **SOP-driven controlled Agent framework** built on Python + LangGraph. It tra
 
 ## Architecture
 
-v2 uses a **REPL outer layer + LangGraph execution inner layer** dual architecture. The REPL provides an interactive command loop (`/help` `/sops` `/history` `/clear` `/exit`, with Tab completion). UserCoordinator handles intent classification and progressive confirmation; once confirmed, the SOP is loaded into the LangGraph execution graph. All LLM calls support token-level streaming output.
+CutinAgent uses a **REPL outer layer + LangGraph execution inner layer** dual architecture. The REPL provides an interactive command loop (`/help` `/sops` `/history` `/clear` `/exit`, with Tab completion). UserCoordinator handles intent classification and progressive confirmation; once confirmed, the SOP is loaded into the LangGraph execution graph. All LLM calls support token-level streaming output.
 
 ## Core Design
 
