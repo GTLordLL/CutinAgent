@@ -4,6 +4,14 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 from utils.debug_logger import log_state_snapshot
+from utils.tts_engine import tts_say
+
+# 报告类工具的 conclusion 值 —— 匹配时立即 TTS 播报
+_REPORT_CONCLUSIONS = {
+    "已生成今日变更日报",
+    "已生成 Commit Message",
+    "已通过子代理生成总结报告",
+}
 
 
 def run_sop_graph(app, state: dict, console=None) -> tuple[dict, list, str, int, list]:
@@ -57,6 +65,10 @@ def run_sop_graph(app, state: dict, console=None) -> tuple[dict, list, str, int,
                         detail_lines.append(f"摘要: {tsm}")
                     if tdv:
                         detail_lines.append(f"变量: {tdv}")
+
+                    # 报告类工具立即 TTS 播报（不等 SOP 执行完毕）
+                    if tsm and tc in _REPORT_CONCLUSIONS:
+                        tts_say(tsm)
 
                 elif node_name == "progress_updater":
                     plan = output.get("sop_plan_steps", "")

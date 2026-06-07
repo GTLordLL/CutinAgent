@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 _ready = False
 _preload_lock = asyncio.Lock()
+_main_loop: "asyncio.AbstractEventLoop | None" = None
 
 # ── 播报队列（单消费者串行播放，避免音频重叠）──
 _tts_queue: "asyncio.Queue[str] | None" = None
@@ -132,13 +133,21 @@ async def _tts_consumer() -> None:
 
 def _ensure_consumer() -> None:
     """确保消费者任务已启动（懒初始化，首次 tts_say 时触发）。"""
-    global _tts_queue, _consumer_task
+    global _tts_queue, _consumer_task, _main_loop
     if _consumer_task is None or _consumer_task.done():
-        _tts_queue = asyncio.Queue()
         try:
-            _consumer_task = asyncio.get_running_loop().create_task(_tts_consumer())
+            loop = asyncio.get_running_loop()
+            _main_loop = loop
+            _tts_queue = asyncio.Queue()
+            _consumer_task = loop.create_task(_tts_consumer())
         except RuntimeError:
-            pass
+            pass  # Worker 线程无法创建 asyncio Task，交由 run_coroutine_threadsafe 路径处理
+
+
+async def _enqueue_text(text: str) -> None:
+    """入队播报文本（供 run_coroutine_threadsafe 从 worker 线程调度到主事件循环）。"""
+    _ensure_consumer()
+    await _tts_queue.put(text)
 
 
 def tts_say(text: str) -> None:
@@ -147,13 +156,24 @@ def tts_say(text: str) -> None:
     文本进入 asyncio.Queue，由后台单消费者串行播放，
     避免多次快速调用时音频重叠。
 
+    支持从主线程（事件循环线程）和 worker 线程调用：
+    - 主线程：直接 put_nowait 入队
+    - Worker 线程：通过 asyncio.run_coroutine_threadsafe 调度到主事件循环入队
+
     Args:
         text: 要朗读的文本。
     """
     from repl.config_manager import get_config
     if get_config().get("tts_enabled", False) and text and text.strip():
+        text = text.strip()
         try:
+            # 主线程路径：直接在事件循环线程操作
+            asyncio.get_running_loop()
             _ensure_consumer()
-            _tts_queue.put_nowait(text.strip())
+            _tts_queue.put_nowait(text)
         except RuntimeError:
-            pass  # 无事件循环时静默跳过
+            # Worker 线程路径：调度到主事件循环
+            if _main_loop and _main_loop.is_running():
+                asyncio.run_coroutine_threadsafe(
+                    _enqueue_text(text), _main_loop
+                )

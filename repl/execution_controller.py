@@ -136,19 +136,6 @@ async def execute_sop_flow(
         )
         await asyncio.sleep(0.3)
 
-        # TTS: Git 报告工具的输出
-        REPORT_CONCLUSIONS = {
-            "已生成今日变更日报",
-            "已生成 Commit Message",
-            "已通过子代理生成总结报告",
-        }
-        for entry in node_outputs:
-            if entry["node_name"] == "tool_executor":
-                tc = entry["output"].get("tool_conclusion", "")
-                ts = entry["output"].get("tool_summary", "")
-                if ts and tc in REPORT_CONCLUSIONS:
-                    tts_say(ts)
-
     except Exception as e:
         sop_stop.set()
         await sop_timer_task
