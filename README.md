@@ -13,18 +13,21 @@ CutinAgent 采用 **REPL 外层 + LangGraph 执行内层** 双层架构。REPL �
 
 ## 核心设计
 
-8 大设计要点详见 [关键设计概述](intro/design/essentials/关键设计概述.md)，各要点独立论述"做了什么、为什么这么做、不这么做会怎样"：
+11 大设计要点详见 [关键设计概述](intro/design/essentials/关键设计概述.md)，各要点独立论述"做了什么、为什么这么做、不这么做会怎样"：
 
 | # | 设计要点 | 核心思路 | 文档 |
 |---|---------|---------|------|
-| 1 | Thinker + Formatter 双阶段 | Thinker(temp 0.4)自由推理 + Formatter(temp 0.0)结构化提取 + Validator 重试兜底 | [ThinkerFormatter设计.md](intro/design/essentials/ThinkerFormatter设计.md) |
-| 2 | UserCoordinator 人机协作网关 | 五字段输出 + 三级渐进确认 + IS_EXECUTE 代码闸门 | [UserCoordinator设计.md](intro/design/essentials/UserCoordinator设计.md) |
-| 3 | Compactor 评价与历史压缩 | 三字段输出 + 代码管理历史生命周期 + 8K 上下文防溢出 | [Compactor设计.md](intro/design/essentials/Compactor设计.md) |
-| 4 | SOP 存储与校验 | Markdown 7 section + 加载时 13 项校验 + CSV 轻量索引 | [SOP体系设计.md](intro/design/essentials/SOP体系设计.md) |
-| 5 | 工具合约与变量传递 | 四字段统一契约 + 字典路由 + VAR_ 变量传递 | [工具合约设计.md](intro/design/essentials/工具合约设计.md) |
-| 6 | 进度更新与重试 | 纯代码机械拼接 + 4 种追加模式 + 剥离-重建重试策略 | [进度更新与重试设计.md](intro/design/essentials/进度更新与重试设计.md) |
-| 7 | 日志系统 | 按 round+node 分目录 + JSON 快照 + 文本日志互补 | [日志系统设计.md](intro/design/essentials/日志系统设计.md) |
-| 8 | 图结构与路由 | 3 节点硬编码路由 + task_status 字符串比对 + ProgressUpdater 无条件回 Scheduler | [图结构与路由设计.md](intro/design/essentials/图结构与路由设计.md) |
+| 3.1 | Thinker + Formatter 双阶段 | Thinker(temp 0.4)自由推理 + Formatter(temp 0.0)结构化提取 + Validator 重试兜底 | [ThinkerFormatter设计.md](intro/design/essentials/ThinkerFormatter设计.md) |
+| 3.2 | UserCoordinator 人机协作网关 | 五字段输出 + 三级渐进确认 + IS_EXECUTE 代码闸门 | [UserCoordinator设计.md](intro/design/essentials/UserCoordinator设计.md) |
+| 3.3 | Compactor 评价与历史压缩 | TaskCompactor(三字段)+ChatCompactor(单字段)双压缩体系 + 代码管理历史生命周期 + 8K 上下文防溢出 | [Compactor设计.md](intro/design/essentials/Compactor设计.md) / [ChatCompactor设计.md](intro/design/essentials/ChatCompactor设计.md) |
+| 3.4 | SOP 存储与校验 | Markdown 7 section + 加载时 13 项校验 + CSV 轻量索引 | [SOP体系设计.md](intro/design/essentials/SOP体系设计.md) |
+| 3.5 | 工具合约与变量传递 | 四字段统一契约 + 字典路由 + VAR_ 变量传递 | [工具合约设计.md](intro/design/essentials/工具合约设计.md) |
+| 3.6 | 进度更新与重试 | 纯代码机械拼接 + 4 种追加模式 + 剥离-重建重试策略 | [进度更新与重试设计.md](intro/design/essentials/进度更新与重试设计.md) |
+| 3.7 | 日志系统 | 按 round+node 分目录 + JSON 快照 + 文本日志互补 | [日志系统设计.md](intro/design/essentials/日志系统设计.md) |
+| 3.8 | 图结构与路由 | 3 节点硬编码路由 + task_status 字符串比对 + ProgressUpdater 无条件回 Scheduler | [图结构与路由设计.md](intro/design/essentials/图结构与路由设计.md) |
+| 3.9 | REPL UI 与流式输出 | Application(full_screen=False) + patch_stdout + buffer_interval 间隔缓冲 + Rich dim 样式分层 | [ui设计文档.md](intro/design/ui设计文档.md) |
+| 3.10 | 会话管理系统 | Session JSON 7字段 + CRUD + 选择器(ConditionalContainer) + 自动保存/命名 + SOP ID 列表快照 | [会话管理设计.md](intro/design/essentials/会话管理设计.md) |
+| 3.11 | 配置管理系统 | 两层配置 + Copy-on-Activate + 持久化 JSON + `/config` 选择器 UI + 6 个可配置项 | [配置管理设计.md](intro/design/essentials/配置管理设计.md) |
 
 更多文档：
 - 架构总览 — **[架构概述](intro/design/architecture/架构概述.md)** | **[架构论述](intro/design/architecture/架构.md)**
@@ -74,18 +77,42 @@ python main.py
 
 ```
 cutin_agent/
-├── main.py                  # 入口：资源初始化 → REPL 循环编排
-├── repl/                    # REPL 基础设施（命令处理、状态管理、会话管理）
-├── config/                  # 模型配置 (model_config.json)
+├── main.py                  # 入口：资源初始化 → REPL 循环编排（调用 repl/ 各模块）
+├── pyproject.toml           # pip install -e . 打包定义 + [project.scripts] 入口 cutin
+├── repl/                    # REPL 基础设施
+│   ├── command_handler.py   # / 命令分发 + Tab 补全 (ReplCompleter)
+│   ├── command_hint.py      # 命令提示功能（输入时的命令建议）
+│   ├── ui_renderer.py       # Rich 渲染函数 (print_welcome, print_user_message 等)
+│   ├── app_builder.py       # prompt_toolkit 组件工厂 (多选择器容器)
+│   ├── state_manager.py     # State 创建、重置
+│   ├── session_manager.py   # 会话 CRUD (save/load/list/delete)
+│   ├── session_picker.py    # 会话选择器 UI (ConditionalContainer)
+│   ├── sop_picker.py        # SOP 多选选择器 UI
+│   ├── sop_runner.py        # LangGraph SOP 图执行封装 + 节点计时 + Panel 渲染
+│   ├── config_manager.py    # 运行时全局配置管理 (get/apply/reset + JSON 持久化)
+│   ├── config_picker.py     # 全局设置选择器 UI (Copy-on-Activate)
+│   ├── execution_controller.py  # SOP 执行流程控制 (确认→执行→评价→满意度)
+│   ├── compaction_controller.py # 自动压缩控制 (token 阈值检查 + ChatCompactor 调用)
+│   └── ...
 ├── graph/                   # LangGraph StateGraph 构建与路由
-├── llm_nodes/               # LLM 节点 (Thinker+Formatter 双阶段模式)
-├── data_nodes/              # 非 LLM 数据节点 (ToolExecutor, ProgressUpdater)
-├── prompts/                 # 提示词模板
-├── tools/                   # 工具箱：ToolDispatcher + 11 个工具
-├── sop/                     # SOP 技能库 (Markdown 文件 + CSV 索引)
+├── llm_nodes/               # LLM 节点 (Thinker+Formatter 双阶段)
+│   ├── UserCoordinatorNode.py   # 人机协作网关（含 SOP 匹配）
+│   ├── TaskCompactorNode.py     # SOP 执行评价 + 对话/执行历史压缩
+│   ├── ChatCompactorNode.py     # 对话上下文压缩（手动/自动触发）
+│   └── SopExecutionSchedulerNode.py  # 步骤调度 + 工具调用决策
+├── data_nodes/              # 非 LLM 数据节点
+│   ├── ToolExecutor.py      # 工具分发 + 结果四字段处理 + 并行调用
+│   ├── ProgressUpdater.py   # 纯代码进度更新（4 种追加模式）
+│   └── VariableStore.py     # 内存变量存储 (VAR_xxx)
+├── parsers/                 # 纯文本解析 (无副作用，不调 LLM)
 ├── validator/               # 输出校验 (防幻觉)
-├── utils/                   # 资源加载、日志、流式输出
-└── history/                 # 运行时日志（git ignored）
+├── prompts/                 # 节点级提示词模板 (thinker + formatter)
+├── tools/                   # 工具箱：ToolDispatcher + 工具注册表 + 10+ 诊断工具
+├── sop/                     # SOP 技能库 (Markdown 文件 + CSV 索引)
+├── user/                    # 用户数据（配置持久化 + 会话 JSON）
+├── utils/                   # 资源加载、日志、流式输出、TTS 引擎
+├── tests/                   # 单元测试
+└── intro/                   # 项目文档（环境配置 + 设计文档）
 ```
 
 ## 新增 SOP
@@ -99,6 +126,12 @@ cutin_agent/
 
 SOP 编写规范详见 [sop编写规范.md](intro/design/sop编写规范.md)。
 
-## License
+## 许可证
 
-MIT License
+本项目采用 **GNU Affero General Public License v3 (AGPL-3.0)** 许可证。简言之：
+
+- **自由使用**：你可以自由使用、修改和分发本项目
+- **开源传染**：对本项目的任何修改和衍生作品，如果通过网络提供服务，必须同样以 AGPL-3.0 开源
+- **商用限制**：如需闭源商用授权，请联系开发者单独协商
+
+详见 [LICENSE](LICENSE) 文件。

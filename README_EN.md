@@ -16,18 +16,21 @@ CutinAgent uses a **REPL outer layer + LangGraph execution inner layer** dual ar
 
 ## Core Design
 
-8 key design points — see [Design Overview](intro/design/essentials/关键设计概述.md) for the full picture. Each point covered in its own deep-dive document (Chinese only):
+11 key design points — see [Design Overview](intro/design/essentials/关键设计概述.md) for the full picture. Each point covered in its own deep-dive document (Chinese only):
 
 | # | Design Point | Core Idea | Document |
 |---|-------------|-----------|---------|
-| 1 | Thinker + Formatter Dual-Phase | Thinker (temp 0.4) free reasoning + Formatter (temp 0.0) structured extraction + Validator retry | [ThinkerFormatter设计.md](intro/design/essentials/ThinkerFormatter设计.md) |
-| 2 | UserCoordinator Gateway | 5-field output + 3-stage progressive confirmation + IS_EXECUTE code gate | [UserCoordinator设计.md](intro/design/essentials/UserCoordinator设计.md) |
-| 3 | Compactor History Compression | 3-field output + code-managed history lifecycle + 8K context overflow prevention | [Compactor设计.md](intro/design/essentials/Compactor设计.md) |
-| 4 | SOP Storage & Validation | Markdown 7-section + 13-rule load-time validation + CSV lightweight index | [SOP体系设计.md](intro/design/essentials/SOP体系设计.md) |
-| 5 | Tool Contract & Variable Passing | 4-field unified contract + dict-based dispatch + VAR_ variable references | [工具合约设计.md](intro/design/essentials/工具合约设计.md) |
-| 6 | Progress Update & Retry | Pure-code mechanical concatenation + 4 update modes + strip-rebuild retry strategy | [进度更新与重试设计.md](intro/design/essentials/进度更新与重试设计.md) |
-| 7 | Logging System | Per-round per-node directory structure + JSON snapshots + text log complement | [日志系统设计.md](intro/design/essentials/日志系统设计.md) |
-| 8 | Graph Structure & Routing | 3-node hardcoded routing + task_status string comparison + ProgressUpdater always returns to Scheduler | [图结构与路由设计.md](intro/design/essentials/图结构与路由设计.md) |
+| 3.1 | Thinker + Formatter Dual-Phase | Thinker (temp 0.4) free reasoning + Formatter (temp 0.0) structured extraction + Validator retry | [ThinkerFormatter设计.md](intro/design/essentials/ThinkerFormatter设计.md) |
+| 3.2 | UserCoordinator Gateway | 5-field output + 3-stage progressive confirmation + IS_EXECUTE code gate | [UserCoordinator设计.md](intro/design/essentials/UserCoordinator设计.md) |
+| 3.3 | Compactor History Compression | TaskCompactor (3-field) + ChatCompactor (1-field) dual compression + code-managed history lifecycle + 8K context overflow prevention | [Compactor设计.md](intro/design/essentials/Compactor设计.md) / [ChatCompactor设计.md](intro/design/essentials/ChatCompactor设计.md) |
+| 3.4 | SOP Storage & Validation | Markdown 7-section + 13-rule load-time validation + CSV lightweight index | [SOP体系设计.md](intro/design/essentials/SOP体系设计.md) |
+| 3.5 | Tool Contract & Variable Passing | 4-field unified contract + dict-based dispatch + VAR_ variable references | [工具合约设计.md](intro/design/essentials/工具合约设计.md) |
+| 3.6 | Progress Update & Retry | Pure-code mechanical concatenation + 4 update modes + strip-rebuild retry strategy | [进度更新与重试设计.md](intro/design/essentials/进度更新与重试设计.md) |
+| 3.7 | Logging System | Per-round per-node directory structure + JSON snapshots + text log complement | [日志系统设计.md](intro/design/essentials/日志系统设计.md) |
+| 3.8 | Graph Structure & Routing | 3-node hardcoded routing + task_status string comparison + ProgressUpdater always returns to Scheduler | [图结构与路由设计.md](intro/design/essentials/图结构与路由设计.md) |
+| 3.9 | REPL UI & Streaming Output | Application(full_screen=False) + patch_stdout + buffer_interval spacing + Rich dim style layering | [ui设计文档.md](intro/design/ui设计文档.md) |
+| 3.10 | Session Management | Session JSON 7-field + CRUD + picker (ConditionalContainer) + auto-save/naming + SOP ID list snapshot | [会话管理设计.md](intro/design/essentials/会话管理设计.md) |
+| 3.11 | Configuration Management | Two-layer config + Copy-on-Activate + JSON persistence + `/config` picker UI + 6 configurable items | [配置管理设计.md](intro/design/essentials/配置管理设计.md) |
 
 More docs (Chinese):
 - Architecture overview — **[Architecture Overview](intro/design/architecture/架构概述.md)** | **[Architecture Deep Dive](intro/design/architecture/架构.md)**
@@ -77,18 +80,42 @@ Supports `/help` `/sops` `/history` `/clear` `/exit` REPL commands with Tab comp
 
 ```
 cutin_agent/
-├── main.py                  # Entry point: resource init → REPL loop orchestration
-├── repl/                    # REPL infrastructure (commands, state, sessions)
-├── config/                  # Model configuration (model_config.json)
+├── main.py                  # Entry: resource init → REPL loop orchestration
+├── pyproject.toml           # pip install -e . package definition + [project.scripts] entry
+├── repl/                    # REPL infrastructure
+│   ├── command_handler.py   # / command dispatch + Tab completion (ReplCompleter)
+│   ├── command_hint.py      # Command hint (inline suggestions while typing)
+│   ├── ui_renderer.py       # Rich render functions (print_welcome, print_user_message, etc.)
+│   ├── app_builder.py       # prompt_toolkit component factory (multi-picker containers)
+│   ├── state_manager.py     # State creation & reset
+│   ├── session_manager.py   # Session CRUD (save/load/list/delete)
+│   ├── session_picker.py    # Session picker UI (ConditionalContainer)
+│   ├── sop_picker.py        # SOP multi-select picker UI
+│   ├── sop_runner.py        # LangGraph SOP graph execution + node timing + Panel render
+│   ├── config_manager.py    # Runtime global config (get/apply/reset + JSON persistence)
+│   ├── config_picker.py     # Settings picker UI (Copy-on-Activate)
+│   ├── execution_controller.py  # SOP execution flow (confirm → run → evaluate → satisfaction)
+│   ├── compaction_controller.py # Auto-compaction (token threshold + ChatCompactor)
+│   └── ...
 ├── graph/                   # LangGraph StateGraph build & routing
-├── llm_nodes/               # LLM nodes (Thinker+Formatter dual-phase pattern)
-├── data_nodes/              # Non-LLM data nodes (ToolExecutor, ProgressUpdater)
-├── prompts/                 # Prompt templates
-├── tools/                   # Toolbox: ToolDispatcher + 11 tools
-├── sop/                     # SOP skill library (Markdown files + CSV index)
+├── llm_nodes/               # LLM nodes (Thinker+Formatter dual-phase)
+│   ├── UserCoordinatorNode.py   # Human-AI collaboration gateway (incl. SOP matching)
+│   ├── TaskCompactorNode.py     # SOP execution evaluation + dialogue/execution compression
+│   ├── ChatCompactorNode.py     # Dialogue context compression (manual/auto trigger)
+│   └── SopExecutionSchedulerNode.py  # Step scheduling + tool call decisions
+├── data_nodes/              # Non-LLM data nodes
+│   ├── ToolExecutor.py      # Tool dispatch + 4-field result handling + parallel calls
+│   ├── ProgressUpdater.py   # Pure-code progress update (4 append modes)
+│   └── VariableStore.py     # In-memory variable store (VAR_xxx)
+├── parsers/                 # Pure text parsing (no side effects, no LLM)
 ├── validator/               # Output validation (anti-hallucination)
-├── utils/                   # Resource loading, logging, streaming
-└── history/                 # Runtime logs (git ignored)
+├── prompts/                 # Node-level prompt templates (thinker + formatter)
+├── tools/                   # Toolbox: ToolDispatcher + tool registry + 10+ diagnostic tools
+├── sop/                     # SOP skill library (Markdown files + CSV index)
+├── user/                    # User data (config persistence + session JSON)
+├── utils/                   # Resource loading, logging, streaming, TTS engine
+├── tests/                   # Unit tests
+└── intro/                   # Documentation (env setup + design docs)
 ```
 
 ## Adding New SOPs
@@ -104,4 +131,10 @@ SOP authoring guidelines: [sop编写规范.md](intro/design/sop编写规范.md) 
 
 ## License
 
-MIT License
+This project is licensed under the **GNU Affero General Public License v3 (AGPL-3.0)**. In short:
+
+- **Free Use**: You are free to use, modify, and distribute this project
+- **Copyleft**: Any modifications or derivative works that are served over a network must also be open-sourced under AGPL-3.0
+- **Commercial Restriction**: For closed-source commercial licensing, please contact the developer separately
+
+See [LICENSE](LICENSE) for the full text.
