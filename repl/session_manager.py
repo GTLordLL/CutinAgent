@@ -4,7 +4,8 @@ import uuid
 from datetime import datetime
 from repl.dialogue_utils import parse_dialogue_text
 
-SESSIONS_DIR = "user/sessions"
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+SESSIONS_DIR = _os.path.join(_PROJECT_ROOT, "user", "sessions")
 SESSION_FIELDS = (
     "session_id", "session_name",
     "conversation_history", "execution_history",
@@ -33,8 +34,10 @@ def _load_dialogue(raw) -> list[dict]:
     return []
 
 
-def create_session_dir(base_dir: str = "history") -> str:
+def create_session_dir(base_dir: str | None = None) -> str:
     """创建会话目录并返回路径。同时确保 user/sessions/ 存在。"""
+    if base_dir is None:
+        base_dir = _os.path.join(_PROJECT_ROOT, "history")
     _get_sessions_dir()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = f"{base_dir}/{timestamp}_repl_session"

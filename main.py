@@ -93,11 +93,7 @@ async def run_repl():
     state = create_initial_state("", session_dir, all_sop_ids)
     valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist())
 
-    # ── 6. 欢迎界面 ─────────────────────────────────────────────
-    console.print()
-    print_welcome(console)
-
-    # ── TTS 预加载（开启时验证 API 连通性）──
+    # ── 6. TTS 预加载（开启时验证 API 连通性，在 banner 前输出）──
     if get_config().get("tts_enabled", False):
         console.print("[dim]正在检测 TTS 服务连通性...[/dim]")
         await preload_tts()
@@ -106,7 +102,11 @@ async def run_repl():
         else:
             console.print("[dim]TTS 服务不可用，播报已自动关闭。[/dim]")
 
-    # ── 7. UI 组件 ──────────────────────────────────────────────
+    # ── 7. 欢迎界面 ─────────────────────────────────────────────
+    console.print()
+    print_welcome(console)
+
+    # ── 8. UI 组件 ──────────────────────────────────────────────
     picker_state = create_picker_state()
     sop_picker_state = create_sop_picker_state()
     config_picker_state = create_config_picker_state()
@@ -318,5 +318,9 @@ async def run_repl():
         console.print("\n[bold]再见！[/bold]")
 
 
-if __name__ == "__main__":
+def main():
+    """Entry point for pip install -e . console_scripts."""
     asyncio.run(run_repl())
+
+if __name__ == "__main__":
+    main()

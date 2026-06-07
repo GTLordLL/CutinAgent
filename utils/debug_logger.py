@@ -2,7 +2,8 @@ import os
 import json
 from datetime import datetime
 
-_session_dir: str = "history"
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_session_dir: str = os.path.join(_PROJECT_ROOT, "history")
 
 
 def set_session_dir(path: str):

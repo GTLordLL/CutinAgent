@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cutin-agent"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+cutin = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = [
+    "repl*",
+    "graph*",
+    "llm_nodes*",
+    "data_nodes*",
+    "parsers*",
+    "validator*",
+    "utils*",
+    "tools*",
+    "user*",
+]
