@@ -65,6 +65,7 @@ from repl.session_controller import (
 from repl.execution_controller import execute_sop_flow
 from repl.keybindings import create_keybindings
 from repl.config_manager import get_config, reset_defaults, apply_config
+from utils.tts_engine import tts_say
 from repl.config_picker import (
     create_config_picker_state,
     get_config_picker_condition,
@@ -165,6 +166,7 @@ __all__ = [
     "get_command_hint_condition",
     "create_command_hint_control",
     "COMMAND_HINT_HEIGHT",
+    "tts_say",
 ]
 
 # 向后兼容别名 — main.py 迁移后可移除

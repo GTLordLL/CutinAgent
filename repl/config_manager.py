@@ -14,6 +14,8 @@ _DEFAULTS = {
     "stream_buffer_interval": 2,
     "input_max_lines": 10,
     "tts_enabled": True,
+    "tts_voice": "zh-CN-XiaoxiaoNeural",
+    "tts_rate": "+0%",
 }
 
 RUNTIME_CONFIG = dict(_DEFAULTS)
@@ -33,9 +35,12 @@ def load_user_config() -> None:
             with open(_USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for k in _DEFAULTS:
-                if k in data and isinstance(data[k], (int, float, bool)):
-                    # 类型强制转换：防止 JSON 将 int 解析为 float
-                    RUNTIME_CONFIG[k] = type(_DEFAULTS[k])(data[k])
+                if k in data:
+                    if isinstance(data[k], (int, float, bool)):
+                        # 类型强制转换：防止 JSON 将 int 解析为 float
+                        RUNTIME_CONFIG[k] = type(_DEFAULTS[k])(data[k])
+                    else:
+                        RUNTIME_CONFIG[k] = data[k]
     except (json.JSONDecodeError, IOError, OSError, TypeError):
         # 文件损坏或不可读：保持默认值，下次保存时覆盖
         pass

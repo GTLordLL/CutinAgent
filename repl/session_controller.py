@@ -15,6 +15,7 @@ from repl.session_manager import (
 )
 from repl.session_picker import activate_picker, deactivate_picker
 from utils.debug_logger import set_session_dir
+from utils.tts_engine import tts_say
 
 
 # ── 基础操作 ──────────────────────────────────────────────────
@@ -81,6 +82,7 @@ async def handle_new_session(state: dict, status_data: dict, app, console) -> No
     )
 
     console.print(f"[bold green]新会话已创建[/bold green]")
+    tts_say("新会话已创建")
     console.print(f"[dim]会话 ID: {new_session_id}[/dim]")
     console.print(f"[dim]会话目录: {new_dir}[/dim]")
     app.invalidate()
@@ -109,6 +111,7 @@ async def handle_show_picker(picker_state: dict, state: dict,
         if loaded:
             restore_session_fields(state, loaded, status_data, app)
             console.print(f"[bold green]会话已恢复: {session_id}[/bold green]")
+            tts_say(f"会话已恢复: {loaded.get('session_name', session_id)}")
             console.print(f"[dim]名称: {loaded.get('session_name', 'Unnamed')}[/dim]")
             console.print(f"[dim]创建时间: {loaded.get('created_at', '?')}[/dim]")
         else:
@@ -126,8 +129,10 @@ async def handle_load_session(session_id: str, state: dict,
     if loaded:
         restore_session_fields(state, loaded, status_data, app)
         console.print(f"[bold green]会话已恢复: {session_id}[/bold green]")
+        tts_say(f"会话已恢复: {loaded.get('session_name', session_id)}")
     else:
         console.print(f"[bold red]会话未找到: {session_id}[/bold red]")
+        tts_say(f"会话未找到: {session_id}")
 
 
 async def handle_show_sop_picker(sop_picker_state: dict, state: dict,
@@ -156,5 +161,6 @@ async def handle_show_sop_picker(sop_picker_state: dict, state: dict,
         state["sop_ids"] = sorted(result.get("selected_ids", []))
         console.print(f"[bold green]SOP 配置已更新[/bold green]")
         console.print(f"[dim]活跃 SOP: {', '.join(state['sop_ids']) or '(无)'}[/dim]")
+        tts_say(f"SOP 配置已更新。活跃SOP: {', '.join(state['sop_ids']) or '(无)'}")
     else:
         console.print("[dim]SOP 配置未更改。[/dim]")

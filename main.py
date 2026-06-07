@@ -8,7 +8,7 @@ from rich.console import Console
 
 from graph.Builder import build_graph
 from utils.LLMResources import initialize_resources
-from utils.tts_engine import speak_async, preload as preload_tts, is_loaded as tts_is_loaded
+from utils.tts_engine import speak_async, preload as preload_tts, is_loaded as tts_is_loaded, tts_say
 from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
 from llm_nodes.TaskCompactorNode import task_compactor_node
@@ -268,8 +268,7 @@ async def run_repl():
                 print_agent_message(console, state["chat_message"])
 
                 # TTS 语音播报（异步，不阻塞后续流程）
-                if get_config().get("tts_enabled", False) and state["chat_message"].strip():
-                    asyncio.create_task(speak_async(state["chat_message"]))
+                tts_say(state["chat_message"])
 
                 state["current_dialogue"].append({"role": "agent", "content": state["chat_message"]})
                 _set_status(state.get("matched_sop_id", ""))

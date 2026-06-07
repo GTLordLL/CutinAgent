@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from utils.sop_loader import load_sop_markdown
+from utils.tts_engine import tts_say
 from data_nodes.VariableStore import clear as clear_variables
 from repl.state_manager import reset_sop_state
 from repl.sop_runner import run_sop_graph
@@ -71,6 +72,7 @@ async def execute_sop_flow(
         )
     except ValueError as e:
         console.print(f"[bold red]SOP 加载失败: {e}[/bold red]")
+        tts_say(f"SOP 加载失败: {e}")
         state["current_dialogue"].append({"role": "error", "content": f"SOP load failed: {e}"})
         return state
 
@@ -127,12 +129,25 @@ async def execute_sop_flow(
 
     # ── 3a. 运行 SOP 图 ──
     try:
-        state, node_timings, final_task_status, total_rounds, _node_outputs = (
+        state, node_timings, final_task_status, total_rounds, node_outputs = (
             await loop.run_in_executor(
                 None, run_sop_graph, app_graph, state, console
             )
         )
         await asyncio.sleep(0.3)
+
+        # TTS: Git 报告工具的输出
+        REPORT_CONCLUSIONS = {
+            "已生成今日变更日报",
+            "已生成 Commit Message",
+            "已通过子代理生成总结报告",
+        }
+        for entry in node_outputs:
+            if entry["node_name"] == "tool_executor":
+                tc = entry["output"].get("tool_conclusion", "")
+                ts = entry["output"].get("tool_summary", "")
+                if ts and tc in REPORT_CONCLUSIONS:
+                    tts_say(ts)
 
     except Exception as e:
         sop_stop.set()
@@ -141,6 +156,7 @@ async def execute_sop_flow(
         top_status_data["elapsed"] = 0
         app.invalidate()
         console.print(f"[bold red]SOP 执行崩溃: {e}[/bold red]")
+        tts_say(f"SOP 执行崩溃: {e}")
         import traceback
         traceback.print_exc()
         state["current_dialogue"].append({"role": "error", "content": f"SOP execution failed: {e}"})
@@ -154,6 +170,7 @@ async def execute_sop_flow(
         title="SOP 执行完毕", title_align="left", padding=(0, 1),
     ))
     set_status_fn(f"完成: {state['matched_sop_id']}")
+    tts_say(f"SOP执行完毕。状态: {final_task_status}，耗时 {sop_elapsed:.0f} 秒，共 {total_rounds} 轮。")
 
     # ── 3b. TaskCompactor（不单独计时，复用 SOP 计时器）──
     console.print("[dim][TaskCompactor] 评价与总结中...[/dim]")
@@ -177,6 +194,7 @@ async def execute_sop_flow(
         state["compactor_evaluation"],
         title="执行评价", title_align="left", padding=(0, 1),
     ))
+    tts_say(state["compactor_evaluation"])
 
     # ── 5. 满意度确认 ──
     set_status_fn("满意吗? (y/n)")
@@ -189,6 +207,7 @@ async def execute_sop_flow(
             state["execution_history"] += "\n" + state["compactor_execution_summary"]
         state["current_dialogue"] = []
         console.print("[dim]总结已记录。可以继续下一个任务了。[/dim]")
+        tts_say("总结已记录。可以继续下一个任务了。")
     else:
         console.print("[dim]总结未记录。请告诉我如何调整？[/dim]")
 

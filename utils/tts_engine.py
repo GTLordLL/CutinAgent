@@ -23,14 +23,14 @@ import edge_tts
 
 logger = logging.getLogger(__name__)
 
-# ── 配置 ──────────────────────────────────────────────────
-
-VOICE = "zh-CN-XiaoxiaoNeural"  # 温暖女声
-
 # ── 模块级状态 ────────────────────────────────────────────
 
 _ready = False
 _preload_lock = asyncio.Lock()
+
+# ── 播报队列（单消费者串行播放，避免音频重叠）──
+_tts_queue: "asyncio.Queue[str] | None" = None
+_consumer_task: "asyncio.Task | None" = None
 
 
 def is_loaded() -> bool:
@@ -53,7 +53,7 @@ async def preload() -> None:
             return
         output_path = f"/tmp/tts_agent_precheck_{uuid.uuid4().hex[:8]}.mp3"
         try:
-            communicate = edge_tts.Communicate("测试", VOICE)
+            communicate = edge_tts.Communicate("测试", "zh-CN-XiaoxiaoNeural")
             await communicate.save(output_path)
             _ready = True
         except Exception:
@@ -80,18 +80,26 @@ async def speak_async(text: str) -> None:
     output_path = f"/tmp/tts_agent_{uuid.uuid4().hex[:8]}.mp3"
 
     try:
-        communicate = edge_tts.Communicate(text, VOICE)
+        from repl.config_manager import get_config
+        cfg = get_config()
+        voice = cfg.get("tts_voice", "zh-CN-XiaoxiaoNeural")
+        rate = cfg.get("tts_rate", "+0%")
+        communicate = edge_tts.Communicate(text, voice, rate=rate)
         await communicate.save(output_path)
 
         if not os.path.exists(output_path):
             return
 
-        # ffplay 播放 MP3（-nodisp 不弹窗，-autoexit 播完退出）
-        subprocess.run(
-            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", output_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=60,
+        # ffplay 播放 MP3（在线程池中运行，不阻塞事件循环）
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", output_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=60,
+            )
         )
 
     except Exception:
@@ -104,3 +112,48 @@ async def speak_async(text: str) -> None:
                 os.remove(output_path)
         except OSError:
             pass
+
+
+async def _tts_consumer() -> None:
+    """后台消费者：从队列取出文本，逐个串行播报。
+
+    阻塞在 queue.get()（空队列时零 CPU），
+    await speak_async 时释放事件循环（ffplay 走 run_in_executor）。
+    """
+    while True:
+        text = await _tts_queue.get()
+        try:
+            await speak_async(text)
+        except Exception:
+            pass
+        finally:
+            _tts_queue.task_done()
+
+
+def _ensure_consumer() -> None:
+    """确保消费者任务已启动（懒初始化，首次 tts_say 时触发）。"""
+    global _tts_queue, _consumer_task
+    if _consumer_task is None or _consumer_task.done():
+        _tts_queue = asyncio.Queue()
+        try:
+            _consumer_task = asyncio.get_running_loop().create_task(_tts_consumer())
+        except RuntimeError:
+            pass
+
+
+def tts_say(text: str) -> None:
+    """如果 TTS 开启，将文本入队播报（不阻塞当前流程）。
+
+    文本进入 asyncio.Queue，由后台单消费者串行播放，
+    避免多次快速调用时音频重叠。
+
+    Args:
+        text: 要朗读的文本。
+    """
+    from repl.config_manager import get_config
+    if get_config().get("tts_enabled", False) and text and text.strip():
+        try:
+            _ensure_consumer()
+            _tts_queue.put_nowait(text.strip())
+        except RuntimeError:
+            pass  # 无事件循环时静默跳过
