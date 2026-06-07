@@ -14,7 +14,7 @@ from prompt_toolkit.filters import Condition
 
 from repl.config_manager import get_config, apply_config, reset_defaults
 
-CONFIG_PICKER_HEIGHT = 8
+CONFIG_PICKER_HEIGHT = 9
 
 # ── 设置项定义 ─────────────────────────────────────────────
 SETTINGS = [
@@ -42,10 +42,16 @@ SETTINGS = [
         "max": 20,
         "step": 1,
     },
+    {
+        "key": "tts_enabled",
+        "label": "TTS 语音播报",
+        "unit": "",          # 布尔型，显示 开启/关闭
+        "type": "bool",
+    },
 ]
 
-BUTTON_SAVE = 3      # 保存按钮在 selected_index 中的位置
-BUTTON_RESET = 4     # 恢复默认按钮位置
+BUTTON_SAVE = 4      # 保存按钮在 selected_index 中的位置
+BUTTON_RESET = 5     # 恢复默认按钮位置
 
 
 # ── State ─────────────────────────────────────────────────
@@ -79,11 +85,17 @@ def create_config_picker_control(state: dict) -> FormattedTextControl:
         setting_lines = []
         for i, s in enumerate(SETTINGS):
             prefix = " >" if i == selected else "   "
-            val = temp.get(s["key"], 0)
             hint = " ← →" if i == selected else ""
-            setting_lines.append(
-                f"{prefix} {s['label']:　<9} {val:>5} {s['unit']:<7}{hint}"
-            )
+            if s.get("type") == "bool":
+                val_display = "开启" if temp.get(s["key"], False) else "关闭"
+                setting_lines.append(
+                    f"{prefix} {s['label']:　<9} {val_display:<5} {s['unit']:<7}{hint}"
+                )
+            else:
+                val = temp.get(s["key"], 0)
+                setting_lines.append(
+                    f"{prefix} {s['label']:　<9} {val:>5} {s['unit']:<7}{hint}"
+                )
 
         # ── 按钮行 ──
         save_prefix = " >" if selected == BUTTON_SAVE else "   "
@@ -146,6 +158,12 @@ def config_picker_adjust(state: dict, direction: str):
 
     setting = SETTINGS[idx]
     key = setting["key"]
+
+    if setting.get("type") == "bool":
+        # 布尔型：Left/Right 切换 True/False
+        state["temp_values"][key] = not state["temp_values"].get(key, False)
+        return
+
     delta = setting["step"] * (-1 if direction == "left" else 1)
     new_val = state["temp_values"][key] + delta
     new_val = max(setting["min"], min(setting["max"], new_val))

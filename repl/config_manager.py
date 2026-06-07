@@ -13,6 +13,7 @@ _DEFAULTS = {
     "auto_compact_threshold": 4096,
     "stream_buffer_interval": 2,
     "input_max_lines": 10,
+    "tts_enabled": True,
 }
 
 RUNTIME_CONFIG = dict(_DEFAULTS)
@@ -32,7 +33,7 @@ def load_user_config() -> None:
             with open(_USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for k in _DEFAULTS:
-                if k in data and isinstance(data[k], (int, float)):
+                if k in data and isinstance(data[k], (int, float, bool)):
                     # 类型强制转换：防止 JSON 将 int 解析为 float
                     RUNTIME_CONFIG[k] = type(_DEFAULTS[k])(data[k])
     except (json.JSONDecodeError, IOError, OSError, TypeError):

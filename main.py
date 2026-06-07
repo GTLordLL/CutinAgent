@@ -8,6 +8,7 @@ from rich.console import Console
 
 from graph.Builder import build_graph
 from utils.LLMResources import initialize_resources
+from utils.tts_engine import speak_async, preload as preload_tts, is_loaded as tts_is_loaded
 from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
 from llm_nodes.TaskCompactorNode import task_compactor_node
@@ -34,6 +35,8 @@ from repl import (
     create_config_picker_state,
     get_config_picker_condition,
     create_config_picker_control,
+    # Config
+    get_config,
     # Command Hint
     create_command_hint_state,
     get_command_hint_condition,
@@ -93,6 +96,15 @@ async def run_repl():
     # ── 6. 欢迎界面 ─────────────────────────────────────────────
     console.print()
     print_welcome(console)
+
+    # ── TTS 预加载（开启时验证 API 连通性）──
+    if get_config().get("tts_enabled", False):
+        console.print("[dim]正在检测 TTS 服务连通性...[/dim]")
+        await preload_tts()
+        if tts_is_loaded():
+            console.print("[dim]TTS 语音服务已就绪。[/dim]")
+        else:
+            console.print("[dim]TTS 服务不可用，播报已自动关闭。[/dim]")
 
     # ── 7. UI 组件 ──────────────────────────────────────────────
     picker_state = create_picker_state()
@@ -254,6 +266,11 @@ async def run_repl():
 
                 console.print()
                 print_agent_message(console, state["chat_message"])
+
+                # TTS 语音播报（异步，不阻塞后续流程）
+                if get_config().get("tts_enabled", False) and state["chat_message"].strip():
+                    asyncio.create_task(speak_async(state["chat_message"]))
+
                 state["current_dialogue"].append({"role": "agent", "content": state["chat_message"]})
                 _set_status(state.get("matched_sop_id", ""))
 

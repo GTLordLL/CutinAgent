@@ -65,7 +65,7 @@ def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
     if name == "/config":
         return True, CmdSignal.SHOW_CONFIG_PICKER, False
 
-    # 未知 / 命令 — 交给 UserCoordinator 当作普通消息
+
     return False, None, False
 
 
@@ -80,7 +80,7 @@ def _build_help_message(resources) -> str:
         "| `/sops` | 列出所有可用 SOP (可以选择) |",
         "| `/history` | 显示当前对话与执行历史摘要 |\n"
         "| `/compact [提示]` | 手动压缩对话上下文，可附带压缩要求 |\n"
-        "| `/config` | 修改全局运行时设置（阈值/缓冲/行数） |",
+        "| `/config` | 修改全局运行时设置（阈值/缓冲/行数/TTS） |",
         "| `/clear` | 保存当前会话并开始新会话 |",
         "| `/resume` | 打开会话选择器，恢复历史会话 |",
         "| `/exit` | 退出 REPL |",
