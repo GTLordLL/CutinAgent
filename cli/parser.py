@@ -42,9 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=str,
-        choices=["plain", "json"],
-        default="plain",
-        help="输出格式 (默认: plain)",
+        choices=["plain", "json", "json-full"],
+        default="json",
+        help="输出格式 (默认: json 最小化；json-full 完整调试；plain 人类可读)",
     )
 
     stream_group = parser.add_mutually_exclusive_group()

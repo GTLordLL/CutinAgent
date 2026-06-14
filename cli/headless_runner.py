@@ -16,7 +16,7 @@ from repl.state_manager import create_initial_state
 from repl.session_manager import generate_session_id, create_session_dir, write_run_summary
 from repl.llm_runner import run_llm_node_sync
 from repl.execution_controller import execute_sop_flow_headless
-from cli.output_formatter import HeadlessRunResult, format_plain, format_json
+from cli.output_formatter import HeadlessRunResult, format_plain, format_json, format_json_full
 
 
 class TimeoutError(Exception):
@@ -207,7 +207,14 @@ def _execute_with_coordinator(state, resources, app_graph, args, session_dir) ->
 
 
 def _output(result, args):
-    """根据 --output 参数输出格式化结果。"""
+    """根据 --output 参数输出格式化结果。
+
+    规则：
+    - --output plain  → 人类可读全文（保持原样）
+    - --output json   → 最小化 JSON（-v 时升级为完整输出）
+    - --output json-full → 完整 JSON（含 node_outputs / compactor / variables）
+    - 错误时：最小化 JSON 也会自动附带 debug 信息
+    """
     if isinstance(result, HeadlessRunResult):
         pass
     elif isinstance(result, dict):
@@ -229,8 +236,14 @@ def _output(result, args):
         r.error = result.get("error")
         result = r
 
-    output_fmt = getattr(args, 'output', 'plain')
-    if output_fmt == 'json':
-        print(format_json(result))
-    else:
+    output_fmt = getattr(args, 'output', 'json')
+    verbose = getattr(args, 'verbose', False)
+
+    if output_fmt == 'plain':
         print(format_plain(result))
+    elif output_fmt == 'json-full' or verbose:
+        # 显式完整输出 / -v 强制调试
+        print(format_json_full(result))
+    else:
+        # 默认 json：最小化（错误自动展开）
+        print(format_json(result))
