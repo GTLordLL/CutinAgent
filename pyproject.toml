@@ -6,6 +6,21 @@ build-backend = "setuptools.build_meta"
 name = "cutin-agent"
 version = "0.1.0"
 requires-python = ">=3.11"
+dependencies = [
+    "langchain-ollama>=1.0.1",
+    "langchain-core>=1.2.22",
+    "langgraph>=1.1.3",
+    "prompt-toolkit>=3.0.52",
+    "rich>=15.0.0",
+    "edge-tts>=7.2.8",
+    "psutil>=7.2.2",
+    "pandas>=3.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
 
 [project.scripts]
 cutin = "main:main"
@@ -24,4 +39,5 @@ include = [
     "utils*",
     "tools*",
     "user*",
+    "cli*",
 ]

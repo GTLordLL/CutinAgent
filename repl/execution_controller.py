@@ -1,7 +1,7 @@
 """SOP 执行流程封装。
 
 将 main.py 中 ~150 行的 SOP 执行流程（确认→加载→执行→Compactor→满意度→历史追加→RUN_SUMMARY）
-封装为单一入口函数。
+封装为单一入口函数。同时提供 headless 版本供 CLI 模式使用。
 """
 
 import asyncio
@@ -13,11 +13,11 @@ from rich.panel import Panel
 
 from utils.sop_loader import load_sop_markdown
 from utils.tts_engine import tts_say
-from data_nodes.VariableStore import clear as clear_variables
+from data_nodes.VariableStore import clear as clear_variables, get_all as get_all_variables
 from repl.state_manager import reset_sop_state
-from repl.sop_runner import run_sop_graph
+from repl.sop_runner import run_sop_graph, _iterate_graph_stream
 from repl.session_manager import write_run_summary
-from repl.llm_runner import fmt_elapsed
+from repl.llm_runner import fmt_elapsed, run_llm_node_sync
 
 
 async def execute_sop_flow(
@@ -211,3 +211,135 @@ async def execute_sop_flow(
 
     clear_variables()
     return state
+
+
+def execute_sop_flow_headless(
+    state: dict,
+    resources,
+    app_graph,
+    valid_tool_ids: set,
+    task_compactor_fn,
+    session_dir: str,
+) -> dict:
+    """执行完整的 SOP 流程（Headless 模式，无 TUI 依赖）。
+
+    与 execute_sop_flow 的区别：
+    - 无确认步骤（调用方已确认）
+    - 无 TTS 播报
+    - 无 Rich Panel 渲染
+    - 无满意度问询（自动记录总结）
+    - 无异步定时器（纯同步）
+
+    Returns:
+        包含执行结果的 dict，字段见 HeadlessRunResult dataclass。
+    """
+    import os as _os
+    from cli.output_formatter import HeadlessRunResult
+
+    # 设置 headless 环境变量，让工具层（report_generator 等）也能静默
+    _os.environ["CUTIN_HEADLESS"] = "1"
+
+    result = HeadlessRunResult()
+    t_start = time.time()
+
+    try:
+        # ── 1. 加载 SOP ──
+        try:
+            sop_md = load_sop_markdown(
+                state["matched_sop_id"],
+                resources.sop_dir,
+                valid_tool_ids,
+            )
+        except ValueError as e:
+            result.status = "error"
+            result.sop_id = state.get("matched_sop_id", "")
+            result.error = f"SOP 加载失败: {e}"
+            return result
+
+        saved_sop_id = state["matched_sop_id"]
+        saved_action = state.get("current_action", state.get("user_instruction", ""))
+        saved_long_term = state.get("long_term_intent", "")
+
+        state = reset_sop_state(state)
+        state.update({
+            "matched_sop_id": saved_sop_id,
+            "sop_objective": sop_md.get("objective", ""),
+            "sop_plan_steps": sop_md.get("plan_steps", ""),
+            "sop_tools_required": sop_md.get("tools_required", ""),
+            "sop_exception_handling": sop_md.get("exception_handling", ""),
+            "retry_limit": (
+                int(sop_md.get("retry_limit", "3").strip())
+                if sop_md.get("retry_limit", "3").strip().isdigit()
+                else 3
+            ),
+            "user_instruction": saved_action,
+            "current_action": saved_action,
+            "long_term_intent": saved_long_term,
+            "task_status": "ONGOING",
+            "current_round": 0,
+        })
+
+        # ── 2. 运行 SOP 图 ──
+        try:
+            state, node_timings, final_task_status, total_rounds, node_outputs = (
+                _iterate_graph_stream(app_graph, state, node_callback=None)
+            )
+        except Exception as e:
+            import traceback
+            result.status = "error"
+            result.sop_id = saved_sop_id
+            result.error = f"SOP 执行崩溃: {e}\n{traceback.format_exc()}"
+            return result
+
+        sop_elapsed = time.time() - t_start
+
+        # ── 3. TaskCompactor（同步，无定时器）──
+        compactor_result, _compactor_elapsed = run_llm_node_sync(
+            "TaskCompactor", task_compactor_fn, state
+        )
+        state.update(compactor_result)
+
+        total_elapsed = time.time() - t_start
+
+        # ── 4. 自动记录总结（headless 无人确认，默认记录）──
+        if state.get("compactor_conversation_summary"):
+            state["conversation_history"] += "\n" + state["compactor_conversation_summary"]
+        if state.get("compactor_execution_summary"):
+            state["execution_history"] += "\n" + state["compactor_execution_summary"]
+        state["current_dialogue"] = []
+
+        # ── 5. 写 RUN_SUMMARY ──
+        write_run_summary(
+            session_dir=session_dir,
+            user_query=state.get("current_action", ""),
+            start_dt=datetime.fromtimestamp(t_start),
+            end_dt=datetime.fromtimestamp(t_start + sop_elapsed),
+            elapsed=sop_elapsed,
+            node_timings=node_timings,
+            final_task_status=final_task_status,
+            total_rounds=total_rounds,
+        )
+
+        # ── 6. 收集变量后清除 ──
+        variables_snapshot = get_all_variables()
+        clear_variables()
+
+        # ── 7. 构造结果 ──
+        result.status = "success"
+        result.sop_id = saved_sop_id
+        result.task_status = final_task_status
+        result.chat_message = state.get("chat_message", "")
+        result.total_rounds = total_rounds
+        result.total_duration_s = total_elapsed
+        result.node_outputs = node_outputs
+        result.compactor_evaluation = state.get("compactor_evaluation", "")
+        result.compactor_conversation_summary = state.get("compactor_conversation_summary", "")
+        result.compactor_execution_summary = state.get("compactor_execution_summary", "")
+        result.variables = variables_snapshot
+        result.final_report = state.get("final_report", "")
+        result.session_dir = session_dir
+
+        return result
+
+    finally:
+        _os.environ.pop("CUTIN_HEADLESS", None)

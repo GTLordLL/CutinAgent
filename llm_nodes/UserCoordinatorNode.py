@@ -7,7 +7,7 @@ from repl.dialogue_utils import dialogue_to_text
 from repl.config_manager import get_config
 
 
-def user_coordinator_node(resources):
+def user_coordinator_node(resources, headless=False):
     """UserCoordinator 可调用对象工厂。
 
     返回一个函数，接收 state dict，执行 Thinker+Formatter 双阶段推理，
@@ -15,6 +15,10 @@ def user_coordinator_node(resources):
 
     输出 5 字段：CHAT_MESSAGE（始终输出）, SOP_ID, CURRENT_ACTION, LONG_TERM_INTENT, IS_EXECUTE。
     IS_EXECUTE 为总闸：false 时渐进式确认，true 时全部确认完毕可执行。
+
+    Args:
+        resources: LLMResources 实例
+        headless: True 时禁用终端输出（CLI 模式）
     """
     thinker_llm = resources.get_llm("user_coordinator_thinker")
     formatter_llm = resources.get_llm("all_formatter")
@@ -22,11 +26,12 @@ def user_coordinator_node(resources):
     formatter_prompt = resources.prompts["user_coordinator_formatter"]
     sops_df = resources.sops_df
     valid_sop_ids = set(sops_df["SOP_ID"].tolist())
-    _console = Console()
+    _console = None if headless else Console()
 
     def coordinator(state: dict) -> dict:
         cfg = get_config()
         buf_interval = float(cfg["stream_buffer_interval"])
+        silent = _console is None
         t_start = time.time()
         round_num = state.get("current_round", 0)
 
@@ -52,8 +57,9 @@ def user_coordinator_node(resources):
             f"<|im_start|>assistant\n"
         )
 
-        _console.out("  [Thinker] ", style="dim")
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim")
+        if _console:
+            _console.out("  [Thinker] ", style="dim")
+        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim", silent=silent)
 
         # --- Formatter with retries ---
         max_retries = 3
@@ -71,8 +77,9 @@ def user_coordinator_node(resources):
 
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
-            _console.out(f"\n  [Formatter{retry_label}] ", style="dim")
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0, console=_console, style="dim")
+            if _console:
+                _console.out(f"\n  [Formatter{retry_label}] ", style="dim")
+            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=2.0, console=_console, style="dim", silent=silent)
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
 

@@ -7,19 +7,23 @@ from repl.dialogue_utils import dialogue_to_text
 from repl.config_manager import get_config
 
 
-def task_compactor_node(resources):
+def task_compactor_node(resources, headless=False):
     """TaskCompactor 可调用对象工厂。
 
     返回一个函数，接收 state dict，执行 Thinker+Formatter 双阶段推理，
     返回 state 更新 dict。
 
     不注册为 LangGraph 节点 —— 由 main.py REPL 循环直接调用。
+
+    Args:
+        resources: LLMResources 实例
+        headless: True 时完全静默，不输出任何内容到终端
     """
     thinker_llm = resources.get_llm("compactor_thinker")
     formatter_llm = resources.get_llm("all_formatter")
     thinker_prompt = resources.prompts["compactor_thinker"]
     formatter_prompt = resources.prompts["compactor_formatter"]
-    _console = Console()
+    _console = None if headless else Console()
 
     def compact_task(state: dict) -> dict:
         cfg = get_config()
@@ -63,8 +67,12 @@ def task_compactor_node(resources):
             f"<|im_start|>assistant\n"
         )
 
-        _console.out("  [Thinker] ", style="dim")
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim")
+        if _console:
+            _console.out("  [Thinker] ", style="dim")
+        reasoning_chain, thinker_tokens = stream_llm(
+            thinker_llm, thinker_raw, buffer_interval=buf_interval,
+            console=_console, style="dim", silent=headless,
+        )
 
         # --- Formatter with retries ---
         max_retries = 3
@@ -82,8 +90,12 @@ def task_compactor_node(resources):
 
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
-            _console.out(f"\n  [Formatter{retry_label}] ", style="dim")
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=buf_interval, console=_console, style="dim")
+            if _console:
+                _console.out(f"\n  [Formatter{retry_label}] ", style="dim")
+            raw_output, fmt_tokens = stream_llm(
+                formatter_llm, current_prompt, buffer_interval=buf_interval,
+                console=_console, style="dim", silent=headless,
+            )
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
 

@@ -2,6 +2,8 @@
 
 封装 run_in_executor + _runtime_timer 模式，消除 main.py 中
 UserCoordinator / ChatCompactor 的三处重复（~51行）。
+
+同时提供 headless 同步版本 run_llm_node_sync，供 CLI 模式使用。
 """
 
 import asyncio
@@ -15,6 +17,26 @@ def fmt_elapsed(seconds: float) -> str:
         s = int(seconds % 60)
         return f"{m}m{s}s"
     return f"{seconds:.0f}s"
+
+
+def run_llm_node_sync(label: str, node_fn, state: dict) -> tuple[dict, float]:
+    """同步执行 LLM 节点函数 —— headless 模式使用。
+
+    无 asyncio、无定时器动画、无 Rich Console。
+    直接调用 node_fn(state)，计录耗时。
+
+    Args:
+        label: 节点标签（headless 下仅用于日志标识）
+        node_fn: 同步可调用，接收 state dict 返回 state 更新 dict
+        state: 当前 state dict
+
+    Returns:
+        (result_dict, elapsed_seconds)
+    """
+    t_start = time.time()
+    result = node_fn(state)
+    elapsed = time.time() - t_start
+    return result, elapsed
 
 
 async def run_llm_node(label: str, node_fn, state: dict,

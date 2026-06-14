@@ -14,11 +14,11 @@ def route_after_scheduler(state: OverallState):
     return END
 
 
-def build_graph(resources: LLMResources):
+def build_graph(resources: LLMResources, headless=False):
     workflow = StateGraph(OverallState)
 
     # 注册节点（SOP 执行内循环）
-    workflow.add_node("sop_execution_scheduler", sop_execution_scheduler_node(resources))
+    workflow.add_node("sop_execution_scheduler", sop_execution_scheduler_node(resources, headless=headless))
     workflow.add_node("tool_executor", tool_executor_node)
     workflow.add_node("progress_updater", progress_updater_node)
 

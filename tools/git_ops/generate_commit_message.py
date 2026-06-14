@@ -21,6 +21,7 @@ def generate_commit_message(data: str) -> dict:
     """调用 LLM 从 git diff 生成 conventional commit message。"""
     try:
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        _headless = os.environ.get("CUTIN_HEADLESS") == "1"
 
         llm = ChatOllama(
             model="qwen3:4b-instruct_q8_8k",
@@ -38,8 +39,9 @@ def generate_commit_message(data: str) -> dict:
 
         cfg = get_config()
         buf_interval = float(cfg["stream_buffer_interval"])
-        print("  [generate_commit_message] ", end="", flush=True)
-        message, usage = stream_llm(llm, prompt, buffer_interval=buf_interval)
+        if not _headless:
+            print("  [generate_commit_message] ", end="", flush=True)
+        message, usage = stream_llm(llm, prompt, buffer_interval=buf_interval, silent=_headless)
         message = message.strip()
 
         return {

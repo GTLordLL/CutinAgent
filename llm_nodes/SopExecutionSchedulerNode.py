@@ -21,17 +21,18 @@ def _parse_multiple_tool_calls(tool_call_raw: str, valid_tool_ids: set) -> list[
     return calls
 
 
-def sop_execution_scheduler_node(resources):
+def sop_execution_scheduler_node(resources, headless=False):
     thinker_llm = resources.get_llm("sop_execution_scheduler_thinker")
     formatter_llm = resources.get_llm("all_formatter")
     thinker_prompt = resources.prompts["sop_execution_scheduler_thinker"]
     formatter_prompt = resources.prompts["sop_execution_scheduler_formatter"]
     tools_df = resources.tools_df
-    _console = Console()
+    _console = None if headless else Console()
 
     def node(state: dict) -> dict:
         cfg = get_config()
         buf_interval = float(cfg["stream_buffer_interval"])
+        silent = _console is None
         t_start = time.time()
         round_num = state.get("current_round", 0)
         user_instruction = state.get("user_instruction", "")
@@ -67,8 +68,9 @@ def sop_execution_scheduler_node(resources):
             f"<|im_start|>assistant\n"
         )
 
-        _console.out("  [Scheduler Thinker] ", style="dim")
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim")
+        if _console:
+            _console.out("  [Scheduler Thinker] ", style="dim")
+        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim", silent=silent)
 
         # --- Formatter with retries ---
         max_retries = 3
@@ -91,8 +93,9 @@ def sop_execution_scheduler_node(resources):
 
         while retries < max_retries:
             retry_label = " (retry)" if retries > 0 else ""
-            _console.out(f"\n  [Scheduler Formatter{retry_label}] ", style="dim")
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=buf_interval, console=_console, style="dim")
+            if _console:
+                _console.out(f"\n  [Scheduler Formatter{retry_label}] ", style="dim")
+            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=buf_interval, console=_console, style="dim", silent=silent)
             if fmt_tokens:
                 formatter_tokens_list.append(fmt_tokens)
 

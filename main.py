@@ -1,5 +1,6 @@
 import asyncio
 import shutil
+import sys
 import traceback
 
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -318,9 +319,30 @@ async def run_repl():
         console.print("\n[bold]再见！[/bold]")
 
 
+def _run_headless_cli():
+    """Headless CLI 入口：解析参数并执行。"""
+    from cli.parser import build_parser
+    from cli.headless_runner import run_headless
+
+    parser = build_parser()
+    args = parser.parse_args()
+    exit_code = run_headless(args)
+    sys.exit(exit_code)
+
+
 def main():
-    """Entry point for pip install -e . console_scripts."""
-    asyncio.run(run_repl())
+    """Entry point for pip install -e . console_scripts.
+
+    路由规则：
+    - cutin run ...  → Headless CLI 模式
+    - cutin           → REPL TUI 模式
+    """
+    if len(sys.argv) > 1 and sys.argv[1] == "run":
+        # 去掉 "run" 子命令，让 argparse 解析剩余参数
+        sys.argv.pop(1)
+        _run_headless_cli()
+    else:
+        asyncio.run(run_repl())
 
 if __name__ == "__main__":
     main()

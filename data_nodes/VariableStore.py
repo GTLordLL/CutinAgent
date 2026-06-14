@@ -25,6 +25,11 @@ def resolve(var_name: str) -> str:
     return _store.get(var_name, "")
 
 
+def get_all() -> dict[str, str]:
+    """返回当前全部变量的浅拷贝。"""
+    return dict(_store)
+
+
 def clear():
     """清空全部变量。"""
     _store.clear()

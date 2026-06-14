@@ -21,6 +21,7 @@ def generate_daily_report(data: str) -> dict:
     """调用 LLM 从 git log 生成今日变更日报。"""
     try:
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        _headless = os.environ.get("CUTIN_HEADLESS") == "1"
 
         llm = ChatOllama(
             model="qwen3:4b-instruct_q8_8k",
@@ -38,8 +39,9 @@ def generate_daily_report(data: str) -> dict:
 
         cfg = get_config()
         buf_interval = float(cfg["stream_buffer_interval"])
-        print("  [generate_daily_report] ", end="", flush=True)
-        report, usage = stream_llm(llm, prompt, buffer_interval=buf_interval)
+        if not _headless:
+            print("  [generate_daily_report] ", end="", flush=True)
+        report, usage = stream_llm(llm, prompt, buffer_interval=buf_interval, silent=_headless)
         report = report.strip()
 
         return {

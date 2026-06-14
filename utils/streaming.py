@@ -16,7 +16,8 @@ def stream_llm(llm, prompt_text: str, label: str = "",
                live_callback: Callable[[str], None] | None = None,
                buffer_interval: float = 0,
                console: Console | None = None,
-               style: str = "") -> tuple[str, dict]:
+               style: str = "",
+               silent: bool = False) -> tuple[str, dict]:
     """流式调用 LLM，实时或间隔输出 token。
 
     Args:
@@ -27,6 +28,7 @@ def stream_llm(llm, prompt_text: str, label: str = "",
         buffer_interval: 间隔秒数，>0 时每 N 秒批量 flush 到 stdout（降低 patch_stdout 压力）。
         console: Rich Console 实例，用于带样式的输出。
         style: Rich style 字符串，如 "dim"。
+        silent: True 时完全不输出任何内容到终端，仅做文本累积（headless 模式）。
 
     Returns:
         (full_text, usage_dict): 累积的完整响应文本和 token 用量信息。
@@ -40,7 +42,10 @@ def stream_llm(llm, prompt_text: str, label: str = "",
         """写入 stdout，优先使用 Rich Console 样式输出。
         每次 flush 的文本末尾必须带 \\n，否则 patch_stdout 的 run_in_terminal
         渲染后光标不换行，下一次输出会覆盖当前行。
+        silent 模式下跳过所有输出。
         """
+        if silent:
+            return
         if console and style:
             console.out(text, style=style, end="")
             console.file.flush()
