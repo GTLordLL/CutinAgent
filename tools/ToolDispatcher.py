@@ -4,6 +4,15 @@ from tools.git_ops.get_git_log import get_git_log
 from tools.git_ops.git_commit import git_commit
 from tools.git_ops.generate_commit_message import generate_commit_message
 from tools.git_ops.generate_daily_report import generate_daily_report
+from tools.git_ops.get_git_branches import get_git_branches
+from tools.git_ops.git_delete_branch import git_delete_branch
+from tools.git_ops.get_git_commits_ahead import get_git_commits_ahead
+from tools.git_ops.git_push import git_push
+from tools.git_ops.generate_pr_description import generate_pr_description
+from tools.git_ops.generate_repo_health import generate_repo_health
+from tools.git_ops.generate_release_notes import generate_release_notes
+from tools.git_ops.get_git_conflicts import get_git_conflicts
+from tools.git_ops.generate_conflict_resolution import generate_conflict_resolution
 from data_nodes.VariableStore import resolve as resolve_variable
 
 
@@ -16,6 +25,15 @@ class ToolDispatcher:
             "git_commit": git_commit,
             "generate_commit_message": generate_commit_message,
             "generate_daily_report": generate_daily_report,
+            "get_git_branches": get_git_branches,
+            "git_delete_branch": git_delete_branch,
+            "get_git_commits_ahead": get_git_commits_ahead,
+            "git_push": git_push,
+            "generate_pr_description": generate_pr_description,
+            "generate_repo_health": generate_repo_health,
+            "generate_release_notes": generate_release_notes,
+            "get_git_conflicts": get_git_conflicts,
+            "generate_conflict_resolution": generate_conflict_resolution,
         }
 
     def dispatch(self, tool_id: str, args: dict):

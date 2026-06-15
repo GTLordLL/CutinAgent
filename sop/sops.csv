@@ -1,3 +1,8 @@
 SOP_ID,Objective,Description,Keywords
 GIT_SMART_COMMIT,"扫描Git工作区变更，自动生成conventional commit message并提交。","检查当前分支的未暂存变更，通过LLM分析diff内容生成高质量的commit message，然后暂存文件并执行git commit。","GIT, commit, stage, add, conventional-commits, message"
 GIT_DAILY_SUMMARY,"汇总今日所有Git提交记录，按类型分类生成结构化的变更日报。","读取今日的git log，通过LLM将提交按feat/fix/refactor/docs等类型分类汇总，生成简洁的开发日报。","GIT, log, daily, summary, report, changelog"
+GIT_BRANCH_CLEANUP,"扫描本地分支列表，识别已合并且可安全删除的过期分支并清理。","列出所有本地分支及其合并状态与最后提交日期，分析可安全删除的分支并执行清理。","GIT, branch, cleanup, merged, delete, stale"
+GIT_PR_PREP,"分析当前分支变更，自动生成PR标题、描述和测试计划，可选推送。","获取领先提交和完整diff，通过LLM生成结构化PR描述，支持自动推送到远程仓库。","GIT, PR, pull-request, push, description, generate, remote"
+GIT_REPO_HEALTH,"对Git仓库进行全面健康检查，生成工作区/分支/提交活跃度综合报告。","组合get_git_status、get_git_branches、get_git_log获取全景数据，通过LLM生成结构化健康报告（评分+分析+改进建议）。","GIT, health, report, check, status, branch, log, audit"
+GIT_RELEASE_NOTES,"读取两个Git tag之间的提交记录，按类型分组生成结构化Release Notes/Changelog。","通过git log获取版本tag间的提交历史，调用LLM按feat/fix/refactor等类型分类聚合，生成面向用户的结构化changelog。","GIT, release-notes, changelog, tag, version, release, log, generate"
+GIT_CONFLICT_RESOLVE,"检测Git merge/rebase冲突文件，分析两侧代码意图并给出解决方案建议。","检测冲突标记文件并提取冲突内容，调用LLM分析每个冲突的两侧意图，推荐keep-ours/keep-theirs/merge-both/rewrite策略及合并后代码。","GIT, conflict, merge, rebase, resolve, diff, analyze"
