@@ -17,7 +17,7 @@ get_git_conflicts, generate_conflict_resolution
 
 ## Plan_Steps
 1. 调用 get_git_conflicts() 检测当前仓库是否存在冲突文件。
-2. 如果步骤1返回无冲突（0个冲突文件），FINISH 并告知用户仓库当前无合并冲突。
+2. 如果步骤1返回无冲突（0个冲突文件），就 FINISH 并告知用户仓库当前无合并冲突。
 3. 调用 generate_conflict_resolution(data=VAR_get_git_conflicts) 分析冲突并生成解决方案建议。
 4. FINISH。
 
