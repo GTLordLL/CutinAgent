@@ -13,6 +13,7 @@ from tools.git_ops.generate_repo_health import generate_repo_health
 from tools.git_ops.generate_release_notes import generate_release_notes
 from tools.git_ops.get_git_conflicts import get_git_conflicts
 from tools.git_ops.generate_conflict_resolution import generate_conflict_resolution
+from tools.git_ops.create_pr import create_pr
 from data_nodes.VariableStore import resolve as resolve_variable
 
 
@@ -34,6 +35,7 @@ class ToolDispatcher:
             "generate_release_notes": generate_release_notes,
             "get_git_conflicts": get_git_conflicts,
             "generate_conflict_resolution": generate_conflict_resolution,
+            "create_pr": create_pr,
         }
 
     def dispatch(self, tool_id: str, args: dict):
