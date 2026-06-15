@@ -2,10 +2,33 @@ import time
 from datetime import date
 from rich.console import Console
 from parsers.tool_call import _build_tool_signature, _split_parallel_calls
+from parsers.sop_plan import _classify_step, StepType, _parse_steps, _reconstruct_plan
 from validator.SopExecutionSchedulerValidator import validate_tool_call, validate_scheduler_output
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
 from repl.config_manager import get_config
+
+
+def _handle_interrupt_resume(sop_plan_steps: str) -> str:
+    """检测 SOP_PLAN 中未标记的 INTERRUPT 步骤并标记为已完成。
+
+    当上次运行以 INTERRUPT 结束时，用户确认后恢复执行，
+    此函数在 Thinker 运行前将 INTERRUPT 步骤标记为完成，
+    让 Thinker 自然跳过它继续执行后续步骤。
+    """
+    steps = _parse_steps(sop_plan_steps)
+    if not steps:
+        return sop_plan_steps
+
+    for s in steps:
+        if _classify_step(s['header']) == StepType.INTERRUPT:
+            # 检查是否已标记（含有"结果:"、"中断已完成"等）
+            if "结果:" not in s['header'] and "中断已完成" not in s['header']:
+                s['header'] = f"{s['header']} 中断已完成，请继续执行。"
+                s['sub_lines'] = []
+                return _reconstruct_plan(steps)
+
+    return sop_plan_steps
 
 
 def _parse_multiple_tool_calls(tool_call_raw: str, valid_tool_ids: set) -> list[dict]:
@@ -41,6 +64,11 @@ def sop_execution_scheduler_node(resources, headless=False):
         sop_exception_handling = state.get("sop_exception_handling", "")
         sop_tools_required = state.get("sop_tools_required", "")
         last_step = state.get("last_step", "")
+
+        # --- INTERRUPT resume: pre-mark INTERRUPT step before Thinker sees it ---
+        prev_task_status = state.get("task_status", "")
+        if prev_task_status == "INTERRUPT":
+            sop_plan_steps = _handle_interrupt_resume(sop_plan_steps)
 
         # --- Filter tools by sop_tools_required ---
         if sop_tools_required:

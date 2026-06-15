@@ -43,60 +43,86 @@ async def execute_sop_flow(
         set_status_fn: 更新底部状态栏的回调，签名 (text: str) -> None
         wait_confirm_fn: 等待用户输入的回调，签名 () -> str
     """
-    # ── 1. 最终确认 ──
-    console.print(Panel(
-        f"[bold]确认执行[/bold]\n"
-        f"SOP: {state['matched_sop_id']}\n"
-        f"行动: {state['current_action']}\n"
-        f"长期计划: {state['long_term_intent']}",
-        title="确认", title_align="left", padding=(0, 1),
-    ))
-    set_status_fn("确认执行? (y=执行 / n=重新规划 / 或输入补充信息)")
-
-    confirm = await wait_confirm_fn()
-    if confirm.lower() != 'y':
-        if confirm.lower() != 'n':
-            # 用户提供了补充信息 → 作为反馈返回给 UserCoordinator
-            return {"feedback": confirm}
-        else:
-            set_status_fn("请重新描述需求")
-            new_msg = await wait_confirm_fn()
-            return {"feedback": new_msg or ""}
-
-    # ── 2. 加载 SOP ──
-    try:
-        sop_md = load_sop_markdown(
-            state["matched_sop_id"],
-            resources.sop_dir,
-            valid_tool_ids,
-        )
-    except ValueError as e:
-        console.print(f"[bold red]SOP 加载失败: {e}[/bold red]")
-        tts_say(f"SOP 加载失败: {e}")
-        state["current_dialogue"].append({"role": "error", "content": f"SOP load failed: {e}"})
-        return state
+    # ── 0. INTERRUPT 恢复检测 ──
+    prev_task_status = state.get("task_status", "")
+    # 仅当上次以 INTERRUPT 结束且 sop_plan_steps 仍保留进度标记时才恢复
+    is_resume = (
+        prev_task_status == "INTERRUPT"
+        and state.get("sop_plan_steps", "").strip() != ""
+    )
 
     saved_sop_id = state["matched_sop_id"]
     saved_action = state["current_action"]
     saved_long_term = state["long_term_intent"]
-    state = reset_sop_state(state)
-    state.update({
-        "matched_sop_id": saved_sop_id,
-        "sop_objective": sop_md.get("objective", ""),
-        "sop_plan_steps": sop_md.get("plan_steps", ""),
-        "sop_tools_required": sop_md.get("tools_required", ""),
-        "sop_exception_handling": sop_md.get("exception_handling", ""),
-        "retry_limit": (
-            int(sop_md.get("retry_limit", "3").strip())
-            if sop_md.get("retry_limit", "3").strip().isdigit()
-            else 3
-        ),
-        "user_instruction": saved_action,
-        "current_action": saved_action,
-        "long_term_intent": saved_long_term,
-        "task_status": "ONGOING",
-        "current_round": 0,
-    })
+
+    # ── 1. 最终确认（恢复模式下跳过） ──
+    if not is_resume:
+        console.print(Panel(
+            f"[bold]确认执行[/bold]\n"
+            f"SOP: {state['matched_sop_id']}\n"
+            f"行动: {state['current_action']}\n"
+            f"长期计划: {state['long_term_intent']}",
+            title="确认", title_align="left", padding=(0, 1),
+        ))
+        set_status_fn("确认执行? (y=执行 / n=重新规划 / 或输入补充信息)")
+
+        confirm = await wait_confirm_fn()
+        if confirm.lower() != 'y':
+            if confirm.lower() != 'n':
+                # 用户提供了补充信息 → 清除 INTERRUPT 状态，作为反馈返回
+                state["task_status"] = "ONGOING"
+                return {"feedback": confirm}
+            else:
+                # 用户选择 n → 清除 INTERRUPT 状态
+                state["task_status"] = "ONGOING"
+                set_status_fn("请重新描述需求")
+                new_msg = await wait_confirm_fn()
+                return {"feedback": new_msg or ""}
+
+    # ── 2. 加载 SOP（恢复模式下保留已有进度） ──
+    if is_resume:
+        # 保留 sop_plan_steps（含进度标记）和 task_status="INTERRUPT"
+        # _handle_interrupt_resume 会在 Scheduler 启动时标记 INTERRUPT 步骤
+        state["user_instruction"] = saved_action
+        state["current_action"] = saved_action
+        state["long_term_intent"] = saved_long_term
+        state["current_round"] = 0
+        console.print(Panel(
+            f"从中断点恢复执行: [bold]{saved_sop_id}[/bold]\n"
+            f"行动: {saved_action}",
+            title="恢复", title_align="left", padding=(0, 1),
+        ))
+    else:
+        try:
+            sop_md = load_sop_markdown(
+                state["matched_sop_id"],
+                resources.sop_dir,
+                valid_tool_ids,
+            )
+        except ValueError as e:
+            console.print(f"[bold red]SOP 加载失败: {e}[/bold red]")
+            tts_say(f"SOP 加载失败: {e}")
+            state["current_dialogue"].append({"role": "error", "content": f"SOP load failed: {e}"})
+            return state
+
+        state = reset_sop_state(state)
+        state.update({
+            "matched_sop_id": saved_sop_id,
+            "sop_objective": sop_md.get("objective", ""),
+            "sop_plan_steps": sop_md.get("plan_steps", ""),
+            "sop_tools_required": sop_md.get("tools_required", ""),
+            "sop_exception_handling": sop_md.get("exception_handling", ""),
+            "retry_limit": (
+                int(sop_md.get("retry_limit", "3").strip())
+                if sop_md.get("retry_limit", "3").strip().isdigit()
+                else 3
+            ),
+            "user_instruction": saved_action,
+            "current_action": saved_action,
+            "long_term_intent": saved_long_term,
+            "task_status": "ONGOING",
+            "current_round": 0,
+        })
 
     # ── 3. 执行 SOP 图 + TaskCompactor（单一计时器） ──
     set_status_fn(f"执行中: {state['matched_sop_id']}")
@@ -183,9 +209,12 @@ async def execute_sop_flow(
     ))
     tts_say(state["compactor_evaluation"])
 
-    # ── 5. 满意度确认 ──
+    # ── 5. 满意度确认 + 状态清理 ──
     set_status_fn("满意吗? (y/n)")
     satisfied = await wait_confirm_fn()
+
+    # 保存写 RUN_SUMMARY 所需字段（reset_sop_state 会清除它们）
+    _run_user_query = state.get("current_action", "")
 
     if satisfied.lower() == 'y':
         if state["compactor_conversation_summary"]:
@@ -195,12 +224,17 @@ async def execute_sop_flow(
         state["current_dialogue"] = []
         console.print("[dim]总结已记录。可以继续下一个任务了。[/dim]")
         tts_say("总结已记录。可以继续下一个任务了。")
+        # FINISH 后清除执行状态，避免干扰后续执行；INTERRUPT 保留状态等待恢复
+        if final_task_status == "FINISH":
+            state = reset_sop_state(state)
     else:
         console.print("[dim]总结未记录。请告诉我如何调整？[/dim]")
+        # 用户拒绝（n）→ 清除全部执行状态，避免残留 INTERRUPT 干扰后续执行
+        state = reset_sop_state(state)
 
     write_run_summary(
         session_dir=session_dir,
-        user_query=state.get("current_action", ""),
+        user_query=_run_user_query,
         start_dt=datetime.fromtimestamp(sop_start),
         end_dt=datetime.fromtimestamp(sop_start + sop_elapsed),
         elapsed=sop_elapsed,
@@ -260,24 +294,38 @@ def execute_sop_flow_headless(
         saved_action = state.get("current_action", state.get("user_instruction", ""))
         saved_long_term = state.get("long_term_intent", "")
 
-        state = reset_sop_state(state)
-        state.update({
-            "matched_sop_id": saved_sop_id,
-            "sop_objective": sop_md.get("objective", ""),
-            "sop_plan_steps": sop_md.get("plan_steps", ""),
-            "sop_tools_required": sop_md.get("tools_required", ""),
-            "sop_exception_handling": sop_md.get("exception_handling", ""),
-            "retry_limit": (
-                int(sop_md.get("retry_limit", "3").strip())
-                if sop_md.get("retry_limit", "3").strip().isdigit()
-                else 3
-            ),
-            "user_instruction": saved_action,
-            "current_action": saved_action,
-            "long_term_intent": saved_long_term,
-            "task_status": "ONGOING",
-            "current_round": 0,
-        })
+        # INTERRUPT 恢复检测
+        prev_task_status = state.get("task_status", "")
+        is_resume = (
+            prev_task_status == "INTERRUPT"
+            and state.get("sop_plan_steps", "").strip() != ""
+        )
+
+        if is_resume:
+            # 保留 sop_plan_steps（含进度标记）和 task_status="INTERRUPT"
+            state["user_instruction"] = saved_action
+            state["current_action"] = saved_action
+            state["long_term_intent"] = saved_long_term
+            state["current_round"] = 0
+        else:
+            state = reset_sop_state(state)
+            state.update({
+                "matched_sop_id": saved_sop_id,
+                "sop_objective": sop_md.get("objective", ""),
+                "sop_plan_steps": sop_md.get("plan_steps", ""),
+                "sop_tools_required": sop_md.get("tools_required", ""),
+                "sop_exception_handling": sop_md.get("exception_handling", ""),
+                "retry_limit": (
+                    int(sop_md.get("retry_limit", "3").strip())
+                    if sop_md.get("retry_limit", "3").strip().isdigit()
+                    else 3
+                ),
+                "user_instruction": saved_action,
+                "current_action": saved_action,
+                "long_term_intent": saved_long_term,
+                "task_status": "ONGOING",
+                "current_round": 0,
+            })
 
         # ── 2. 运行 SOP 图 ──
         try:
@@ -308,10 +356,17 @@ def execute_sop_flow_headless(
             state["execution_history"] += "\n" + state["compactor_execution_summary"]
         state["current_dialogue"] = []
 
+        # 保存 RUN_SUMMARY 所需字段（reset_sop_state 会清除）
+        _run_user_query = state.get("current_action", "")
+
+        # FINISH 后清除执行状态，避免残留 INTERRUPT 干扰后续执行
+        if final_task_status == "FINISH":
+            state = reset_sop_state(state)
+
         # ── 5. 写 RUN_SUMMARY ──
         write_run_summary(
             session_dir=session_dir,
-            user_query=state.get("current_action", ""),
+            user_query=_run_user_query,
             start_dt=datetime.fromtimestamp(t_start),
             end_dt=datetime.fromtimestamp(t_start + sop_elapsed),
             elapsed=sop_elapsed,

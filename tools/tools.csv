@@ -1,6 +1,6 @@
 Tool_ID,Keywords,Func_Desc,Args_Schema,param_desc
 get_git_status,"GIT, status, porcelain, working-tree, branch",获取Git工作区状态（分支名+文件变更计数）。,{},无需参数。
-get_git_diff,"GIT, diff, changes",获取Git工作区代码变更差异（超200行截断）。,"{""staged"": ""bool (default false)""}",staged: 是否查看已暂存变更，默认False（查看未暂存）。
+get_git_diff,"GIT, diff, changes, branch, base",获取 Git 代码变更差异。支持工作区 diff 和分支累积 diff（git diff base...HEAD）两种模式。,"{""staged"": ""str (default false)"", ""base"": ""str (default """")""}",staged: 是否只获取已暂存变更（true/false）。base: 对比基线（如 origin/main），传入时忽略 staged 获取分支累积 diff。留空则获取工作区 diff。
 get_git_log,"GIT, log, history, commits, tag, range",获取Git提交历史记录（支持today/yesterday/Ndays时间过滤或 tag 范围）。,"{""since"": ""str (default today)"", ""author"": ""str (optional)"", ""limit"": ""int (default 50)"", ""from_tag"": ""str (optional)"", ""to_tag"": ""str (optional)""}",since: 起始时间 today/yesterday/Ndays，默认today。author: 按作者筛选（可选）。limit: 返回条数，默认50，上限100。from_tag: 起始tag如v0.1.0（可选，与to_tag配合覆盖since）。to_tag: 结束tag/ref，默认HEAD（可选）。
 git_commit,"GIT, commit, stage, add",暂存指定文件并提交。第一个写操作工具，失败可用git reset --soft HEAD~1回滚。,"{""message"": ""str (commit message)"", ""files"": ""str (default . 表示全部)""}",message: 提交信息（必填）。files: 要暂存的文件路径，默认'.'表示全部。
 generate_commit_message,"GIT, commit-message, generate",调用LLM从git diff生成conventional commit message。,"{""data"": ""str (git diff输出)""}",data: git diff输出文本（必填），通常引用 VAR_get_git_diff。
