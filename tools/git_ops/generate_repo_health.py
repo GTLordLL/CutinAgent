@@ -65,7 +65,7 @@ def generate_repo_health(status: str, branches: str, log: str) -> dict:
         return {
             "status": "成功",
             "conclusion": "已生成仓库健康报告",
-            "summary": description,
+            "summary": description if len(description) <= 500 else description[:500] + "...",
             "detail": description,
             "token_usage": usage,
         }

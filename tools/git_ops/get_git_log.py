@@ -58,10 +58,17 @@ def get_git_log(since: str = "today", author: str = "",
             }
 
         lines = output.strip().split('\n')
+        # Build compact summary with actual commit info (hash + oneline)
+        # Format: %h %ad %an: %s → compact each line to 80 chars max
+        show = min(len(lines), 20)
+        compact = " | ".join(line[:80] for line in lines[:show])
+        summary = f"共{len(lines)}条: {compact}"
+        if len(lines) > 20:
+            summary += f" ...等{len(lines)}条"
         return {
             "status": "成功",
             "conclusion": f"在 {range_label} 范围内找到 {len(lines)} 条提交",
-            "summary": f"{len(lines)} 条提交记录",
+            "summary": summary,
             "detail": output.strip(),
         }
 

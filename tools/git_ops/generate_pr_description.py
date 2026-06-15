@@ -62,7 +62,7 @@ def generate_pr_description(diff: str, commits: str) -> dict:
         return {
             "status": "成功",
             "conclusion": "已生成 PR 描述",
-            "summary": description,
+            "summary": description if len(description) <= 500 else description[:500] + "...",
             "detail": description,
             "token_usage": usage,
         }

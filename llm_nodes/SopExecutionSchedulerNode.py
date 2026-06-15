@@ -1,4 +1,3 @@
-import re
 import time
 from datetime import date
 from rich.console import Console
@@ -7,7 +6,6 @@ from validator.SopExecutionSchedulerValidator import validate_tool_call, validat
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
 from repl.config_manager import get_config
-from data_nodes.VariableStore import resolve as resolve_variable
 
 
 def _parse_multiple_tool_calls(tool_call_raw: str, valid_tool_ids: set) -> list[dict]:
@@ -68,16 +66,6 @@ def sop_execution_scheduler_node(resources, headless=False):
             f"AVAILABLE_TOOLS:\n{tools_text}\n"
         )
 
-        # --- 注入 VAR_ 变量内容，让 Scheduler 拿到工具输出的完整数据 ---
-        var_refs = re.findall(r'\[变量:\s*(VAR_\w+(?:_\d+)?)\s*\]', sop_plan_steps)
-        if var_refs:
-            var_texts = []
-            for var_name in var_refs:
-                content = resolve_variable(var_name)
-                if content:
-                    var_texts.append(f"[{var_name} 内容]\n{content}")
-            if var_texts:
-                thinker_input += "\n\n" + "\n\n".join(var_texts)
         thinker_raw = (
             f"<|im_start|>system\n{thinker_prompt}<|im_end|>\n"
             f"<|im_start|>user\n{thinker_input}<|im_end|>\n"

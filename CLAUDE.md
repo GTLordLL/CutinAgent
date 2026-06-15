@@ -65,87 +65,26 @@ patch_stdout 的 run_in_terminal 渲染机制：每次 flush后光标停留在�
 ## 4. 目录结构
 
 ```
-main.py                       # 入口：资源初始化 → REPL 循环编排（调用 repl/ 各模块）
-pyproject.toml                # pip install -e . 打包定义 + [project.scripts] 入口 cutin
-repl/                         # REPL 基础设施
-  __init__.py                 # 导出所有公开 API
-  command_handler.py          # / 命令分发 + Tab 补全 (ReplCompleter)
-  command_hint.py             # 命令提示功能（输入时的命令建议）
-  ui_renderer.py              # Rich 渲染函数 (print_welcome, print_user_message 等)
-  app_builder.py              # prompt_toolkit 组件工厂 (create_input_field, build_application, 多选择器容器 等)
-  state_manager.py            # State 创建、重置
-  session_manager.py          # 会话 CRUD (save/load/list/delete) + RUN_SUMMARY
-  session_controller.py       # 会话生命周期控制 (新建/加载/恢复)
-  session_picker.py           # 会话选择器 UI (ConditionalContainer, 8行/5条)
-  sop_picker.py               # SOP 多选选择器 UI（多选勾选，Enter确认）
-  sop_runner.py               # LangGraph SOP 图执行封装 + 节点计时 + Panel 渲染
-  config_manager.py           # 运行时全局配置管理 (get/apply/reset + JSON 持久化)
-  config_picker.py            # 全局设置选择器 UI (Copy-on-Activate, 11行)
-  compaction_controller.py    # 自动压缩控制 (token 阈值检查 + ChatCompactor 调用)
-  execution_controller.py     # SOP 执行流程控制 (确认→执行→评价→满意度)
-  dialogue_utils.py           # 对话解析工具 (str↔list[dict] 格式转换)
-  keybindings.py              # 全局按键绑定（含三种 Picker 的 filter 隔离）
-  llm_runner.py               # LLM 节点统一调用封装（线程池 + 计时 + 状态栏更新）
-graph/
-  Builder.py                  # StateGraph: 3节点 + 1条件路由（不含 UserCoordinator/Compactor）
-  OverallState.py             # 全局状态 TypedDict（含 REPL 状态字段）
-  __init__.py
-llm_nodes/                    # LLM 节点 (Thinker+Formatter)
-  UserCoordinatorNode.py      # REPL 外层：人机协作网关（含 SOP 匹配）
-  TaskCompactorNode.py        # REPL 外层：SOP 执行评价 + 对话/执行历史压缩（三字段）
-  ChatCompactorNode.py        # REPL 外层：对话上下文压缩（单字段，手动/自动触发）
-  SopExecutionSchedulerNode.py # 图内层：步骤调度 + 工具调用决策
-  InitialSOPRetrieverNode.py  # [v1 遗留] 不再使用
-data_nodes/                   # 非LLM 节点
-  ToolExecutor.py             # 工具分发 + 结果四字段处理 + 并行调用
-  ProgressUpdater.py          # 纯代码进度更新（4 种追加模式 + 跳过间隙）
-  VariableStore.py            # 内存变量存储 (VAR_xxx)
-parsers/                      # 纯文本解析 (无副作用)
-  __init__.py
-  sop_plan.py                 # StepType 枚举, 步骤解析/分类/重构
-  tool_call.py                # 工具签名构建, 并行调用分割
-validator/
-  SopSpecChecker.py           # Plan_Steps DSL 13项校验 + Retry_Limit 校验
-  SopExecutionSchedulerValidator.py  # Formatter 输出校验 (单工具+调度器三元组)
-  UserCoordinatorValidator.py # 五字段校验 + IS_EXECUTE 闸门规则 + SOP_ID 白名单
-  CompactorValidator.py       # 三字段校验
-  InitialSOPRetrieverValidator.py    # [v1 遗留] 不再使用
-tools/
-  __init__.py
-  ToolDispatcher.py           # 工具路由分发 + VAR_ 变量解析
-  tools.csv                   # 工具注册表 (Tool_ID, Keywords, Func_Desc, Args_Schema, param_desc)
-  report_generator.py         # LLM 报告生成器
-  linux_ops/                  # 10 个 Linux 诊断工具
-  git_ops/                    # Git 操作工具（6 个）
-    prompts/                  # 工具 LLM prompts
-  prompts/                    # 工具级 LLM prompts
-prompts/                      # 节点级 prompts (thinker + formatter)
-sop/                          # SOP 存储
-  sops.csv                    # SOP 索引 (SOP_ID, Objective, Description, Keywords)
-  GIT_SMART_COMMIT.md         # SOP markdown 全文
-  GIT_DAILY_SUMMARY.md
-  draft/                      # SOP 草稿
-user/                         # 用户数据（配置 + 会话持久化）
-  config/
-    model_config.json         # 各节点 LLM 参数 (model_id, temperature, top_p, etc.)
-    load_model_config.py      # 配置加载 + Ollama URL 解析
-    user_config.json          # 运行时配置持久化（自动保存/加载）
-  sessions/                   # 会话 JSON 文件 ({session_id}.json)
-utils/                        # 工具函数
-  LLMResources.py             # 资源初始化：LLM 实例 + prompts + CSV 加载
-  debug_logger.py             # 节点级调试日志（Thinker 输入/推理链/Formatter 重试/耗时/token）
-  streaming.py                # token 级流式输出
-  sop_loader.py               # SOP markdown 加载 + SOP_LIBRARY 索引构建
-  load_prompts.py             # Prompt 文件加载
-  load_csv.py                 # CSV 文件加载
-  monitor_token.py            # Token 用量监控
-  tts_engine.py               # TTS 语音播报引擎（edge-tts + ffplay + 播报队列）
-tests/                        # 单元测试
-  __init__.py
-  test_retry_logic.py         # ProgressUpdater 重试逻辑
-  test_git_smart_commit.py    # GIT_SMART_COMMIT SOP 集成测试
-  test_streaming.py           # 流式输出测试
-intro/                        # 项目文档（环境配置 + 设计文档）
+main.py                       # 入口：CLI/REPL 路由分发
+pyproject.toml                # pip install -e .  + [project.scripts] 入口 cutin
+cli/                          # Headless CLI (cutin run) — parser, runner, output formatter
+repl/                         # REPL/TUI 基础设施 — 命令处理、会话、配置、UI渲染、执行控制
+graph/                        # LangGraph StateGraph: Builder + OverallState TypedDict
+llm_nodes/                    # LLM 节点 (Thinker+Formatter): UserCoordinator, Scheduler, Compactors
+data_nodes/                   # 非LLM 节点: ToolExecutor, ProgressUpdater, VariableStore
+parsers/                      # 纯文本解析，无副作用: sop_plan, tool_call
+validator/                    # 校验函数 (bool, reason, parsed): SOP, Scheduler, Coordinator, Compactor
+tools/                        # 工具系统
+  ToolDispatcher.py           # 路由分发 + VAR_ 变量解析
+  tools.csv                   # 工具注册表
+  git_ops/                    # 15 个 Git 工具 (采集/动作/生成) + 各工具 LLM prompts/
+  linux_ops/                  # Linux 诊断工具
+prompts/                      # 节点级 Thinker + Formatter prompts
+sop/                          # 7 个 SOP markdown + sops.csv 索引 + draft/ 草稿
+user/                         # 用户数据: config/ (模型+运行时配置), sessions/ (会话JSON)
+utils/                        # 资源加载、流式输出、日志、SOP加载、TTS
+tests/                        # 单元测试 + demo 环境
+intro/                        # 项目文档（架构 + 设计 + 环境配置）
 history/                      # 会话日志 {ts}_{slug}/
 ```
 
