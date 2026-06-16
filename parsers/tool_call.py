@@ -77,3 +77,40 @@ def _split_parallel_calls(tool_call_raw: str) -> list[str]:
     if remaining:
         parts.append(remaining)
     return parts
+
+
+def parse_single_call(call_str: str) -> tuple | None:
+    """Parse a single tool call string into (tool_id, args_dict).
+
+    Handles formats like:
+        Tool_ID()                          → ('Tool_ID', {})
+        Tool_ID(count=10)                  → ('Tool_ID', {'count': 10})
+        Tool_ID(staged='false', base='')   → ('Tool_ID', {'staged': 'false', 'base': ''})
+
+    Returns None if the call string cannot be parsed.
+    """
+    m = re.match(r'(\w+)\((.*)\)', call_str.strip())
+    if not m:
+        return None
+    tool_id = m.group(1)
+    args_str = m.group(2).strip()
+    args = {}
+    if args_str:
+        # Match key=value pairs; value can be single-quoted, double-quoted, or bare
+        for kv_match in re.finditer(
+            r"(\w+)\s*=\s*(?:'([^']*)'|\"([^\"]*)\"|(\d+(?:\.\d+)?)|((?i:true|false|none)))",
+            args_str
+        ):
+            key = kv_match.group(1)
+            if kv_match.group(2) is not None:       # single-quoted
+                val = kv_match.group(2)
+            elif kv_match.group(3) is not None:     # double-quoted
+                val = kv_match.group(3)
+            elif kv_match.group(4) is not None:     # numeric — keep as string, tools cast with int()/float() as needed
+                val = kv_match.group(4)
+            elif kv_match.group(5) is not None:     # True/False/None — keep as string to avoid bool.lower() AttributeError
+                val = kv_match.group(5)
+            else:
+                continue
+            args[key] = val
+    return tool_id, args

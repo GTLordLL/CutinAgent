@@ -55,6 +55,8 @@ def initialize_resources() -> LLMResources:
     prompts = {
         "user_coordinator_thinker": load_prompt_file("./prompts/user_coordinator/thinker.md"),
         "user_coordinator_formatter": load_prompt_file("./prompts/user_coordinator/formatter.md"),
+        "problem_analyzer_thinker": load_prompt_file("./prompts/problem_analyzer/thinker.md"),
+        "problem_analyzer_formatter": load_prompt_file("./prompts/problem_analyzer/formatter.md"),
         "compactor_thinker": load_prompt_file("./prompts/compactor/thinker.md"),
         "compactor_formatter": load_prompt_file("./prompts/compactor/formatter.md"),
         "chat_compactor_thinker": load_prompt_file("./prompts/chat_compactor/thinker.md"),

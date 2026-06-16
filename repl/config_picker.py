@@ -14,7 +14,7 @@ from prompt_toolkit.filters import Condition
 
 from repl.config_manager import get_config, apply_config, reset_defaults
 
-CONFIG_PICKER_HEIGHT = 11
+CONFIG_PICKER_HEIGHT = 13
 
 # ── 设置项定义 ─────────────────────────────────────────────
 SETTINGS = [
@@ -40,6 +40,20 @@ SETTINGS = [
         "unit": "行",
         "min": 1,
         "max": 20,
+        "step": 1,
+    },
+    {
+        "key": "analyzer_enabled",
+        "label": "问题分析员",
+        "unit": "",
+        "type": "bool",
+    },
+    {
+        "key": "analyzer_max_rounds",
+        "label": "分析最大轮数",
+        "unit": "轮",
+        "min": 1,
+        "max": 5,
         "step": 1,
     },
     {
@@ -74,8 +88,8 @@ SETTINGS = [
     },
 ]
 
-BUTTON_SAVE = 6      # 保存按钮在 selected_index 中的位置
-BUTTON_RESET = 7     # 恢复默认按钮位置
+BUTTON_SAVE = 8      # 保存按钮在 selected_index 中的位置
+BUTTON_RESET = 9     # 恢复默认按钮位置
 
 
 # ── State ─────────────────────────────────────────────────

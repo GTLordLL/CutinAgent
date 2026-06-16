@@ -14,6 +14,9 @@ from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
 from llm_nodes.TaskCompactorNode import task_compactor_node
 from llm_nodes.ChatCompactorNode import chat_compactor_node
+from llm_nodes.ProblemAnalyzerNode import problem_analyzer_node
+from tools.ToolDispatcher import ToolDispatcher
+from parsers.tool_call import _split_parallel_calls, parse_single_call
 from repl import (
     # State
     create_initial_state,
@@ -83,6 +86,8 @@ async def run_repl():
     user_coordinator_fn = user_coordinator_node(resources)
     task_compactor_fn = task_compactor_node(resources)
     chat_compactor_fn = chat_compactor_node(resources)
+    problem_analyzer_fn = problem_analyzer_node(resources)
+    tool_dispatcher = ToolDispatcher()
 
     # ── 4. 会话目录 ────────────────────────────────────────────
     session_dir = create_session_dir()
@@ -243,6 +248,81 @@ async def run_repl():
                 await try_auto_compact(
                     state, chat_compactor_fn, top_status_data, app, console
                 )
+
+                # --- Problem Analyzer (v0.2) -----------------------------------
+                cfg = get_config()
+                if cfg.get("analyzer_enabled", True):
+                    analyzer_rounds = 0
+                    max_rounds = int(cfg.get("analyzer_max_rounds", 3))
+
+                    while analyzer_rounds < max_rounds:
+                        _set_status("分析中...")
+                        console.print(
+                            f"[dim][ProblemAnalyzer] 信息收集中... "
+                            f"(第 {analyzer_rounds + 1}/{max_rounds} 轮)[/dim]"
+                        )
+
+                        analyzer_result, _a_elapsed = await run_llm_node(
+                            "ProblemAnalyzer", problem_analyzer_fn, state,
+                            top_status_data, app, console
+                        )
+                        await asyncio.sleep(0.3)
+                        state.update(analyzer_result)
+
+                        confidence = state.get("analyzer_confidence", "low")
+                        console.print(
+                            f"[dim][ProblemAnalyzer] 置信度: {confidence}, "
+                            f"当前状态: {state.get('analyzer_current_state', '')[:80]}...[/dim]"
+                        )
+
+                        # 高置信度 → 提前退出
+                        if confidence == "high":
+                            my_understanding = state.get("analyzer_my_understanding", "")
+                            console.print(
+                                f"[dim][ProblemAnalyzer] 高置信度，推断意图: "
+                                f"{my_understanding[:100]}[/dim]"
+                            )
+                            break
+
+                        tool_call = state.get("analyzer_tool_call", "")
+                        if not tool_call or tool_call.strip().upper() == "NONE":
+                            console.print("[dim][ProblemAnalyzer] 无工具调用，退出分析循环。[/dim]")
+                            break
+
+                        # 解析并行调用，执行工具
+                        calls = _split_parallel_calls(tool_call)
+                        _set_status(f"执行工具: {tool_call[:50]}...")
+                        for call_str in calls:
+                            parsed = parse_single_call(call_str)
+                            if parsed is None:
+                                console.print(
+                                    f"[dim][ProblemAnalyzer] 工具调用解析失败: "
+                                    f"{call_str[:60]}[/dim]"
+                                )
+                                continue
+                            tool_id, args = parsed
+                            console.print(
+                                f"[dim][ProblemAnalyzer] 执行: {tool_id}"
+                                f"({', '.join(f'{k}={v}' for k, v in args.items())})[/dim]"
+                            )
+                            result = tool_dispatcher.dispatch(tool_id, args)
+                            # 追加工具执行结果到 execution_history
+                            exec_entry = (
+                                f"[Analyzer Round {analyzer_rounds + 1}] "
+                                f"{tool_id}({', '.join(f'{k}={v}' for k, v in args.items())}): "
+                                f"status=\"{result.get('status', '?')}\", "
+                                f"summary=\"{result.get('summary', result.get('conclusion', ''))[:200]}\""
+                            )
+                            current_exec = state.get("execution_history", "")
+                            state["execution_history"] = (
+                                current_exec + "\n" + exec_entry
+                                if current_exec
+                                else exec_entry
+                            )
+
+                        analyzer_rounds += 1
+
+                    state["analyzer_rounds_used"] = analyzer_rounds
 
                 # --- UserCoordinator -------------------------------------------
                 _set_status("分析中...")
