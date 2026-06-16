@@ -172,5 +172,4 @@ __all__ = [
     "tts_say",
 ]
 
-# 向后兼容别名 — main.py 迁移后可移除
-_generate_session_id = generate_session_id
+

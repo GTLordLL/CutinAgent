@@ -17,12 +17,7 @@
 - **validator/**: 返回 `(bool, reason, parsed)` 的校验函数
 - **llm_nodes/ data_nodes/**: LangGraph 节点编排，调用 parsers + validators
 - 新增代码时，先判断属于哪一层，不要把所有逻辑堆在节点文件里
-- **流式输出换行规则**：每次 flush 的文本末尾必须带 `\n`，否则光标不换行，
-  下一次输出会覆盖当前行。标签使用 `Console.out()` 默认 `end="\n"` 即可
-- **patch_stdout 不可移除**：`full_screen=False` 模式下，`patch_stdout` 的 `StdoutProxy`
-  通过 `run_in_terminal` 在输出前保存光标、输出后恢复，这是 Application 输入栏
-  固定在终端底部的关键。去掉后 Application 会随输出内容不断下移。即使 Rich Console
-  输出可能部分绕过代理，`patch_stdout` 整体协调机制仍然保证布局稳定，不要去动它
+
 
 ### 提示词编写原则
 
@@ -34,7 +29,14 @@
 - Thinker prompt 的推理步骤本身就是一种引导式模板，模型沿着它走就不容易跑偏
 - Formatter 不做创造性工作（temp 0.0），只做提取；Validator 做最后一道格式防线
 
-### flush 末尾加 '\n'
+### tui 须知
+- **流式输出换行规则**：每次 flush 的文本末尾必须带 `\n`，否则光标不换行，
+  下一次输出会覆盖当前行。标签使用 `Console.out()` 默认 `end="\n"` 即可
+- **patch_stdout 不可移除**：`full_screen=False` 模式下，`patch_stdout` 的 `StdoutProxy`
+  通过 `run_in_terminal` 在输出前保存光标、输出后恢复，这是 Application 输入栏
+  固定在终端底部的关键。去掉后 Application 会随输出内容不断下移。即使 Rich Console
+  输出可能部分绕过代理，`patch_stdout` 整体协调机制仍然保证布局稳定，不要去动它
+- **flush 末尾加 '\n'**
 patch_stdout 的 run_in_terminal 渲染机制：每次 flush后光标停留在输出文本末尾，不会自动换行。如果下一次 flush（或后续 Rich输出）从同一行开始写，必然覆盖当前行内容。
 
 ## 3. 关键设计

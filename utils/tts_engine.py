@@ -16,6 +16,7 @@
 import asyncio
 import logging
 import os
+import re
 import subprocess
 import uuid
 
@@ -64,6 +65,72 @@ async def preload() -> None:
                 os.remove(output_path)
             except OSError:
                 pass
+
+
+def _clean_markdown(text: str) -> str:
+    """清洗 Markdown 符号，使 TTS 播报更自然。
+
+    移除/替换常见的 Markdown 格式标记，保留纯文本语义内容。
+    按顺序处理，避免清洗后的残留字符被后续规则误匹配。
+
+    Args:
+        text: 可能包含 Markdown 格式的原始文本。
+
+    Returns:
+        清洗后的纯文本。
+    """
+    # ── 第1层：反斜杠转义（必须在所有格式规则之前处理）──
+    # 1. 反斜杠转义: \*, \[, \` 等 → 移除反斜杠
+    text = re.sub(r'\\([\\`*_{}\[\]()#+\-.!|~])', r'\1', text)
+
+    # ── 第2层：链接/图片（提取 alt/text，丢弃 URL）──
+    # 2. 图片: ![alt](url) -> alt
+    text = re.sub(r'!\[([^\]]*)\]\([^)]+\)', r'\1', text)
+    # 3. 链接: [text](url) -> text
+    text = re.sub(r'\[([^\]]*)\]\([^)]+\)', r'\1', text)
+
+    # ── 第3层：代码（先处理多行代码块，再处理行内代码）──
+    # 4. 围栏代码块: ```lang\n...\n``` -> 保留内容
+    text = re.sub(r'```\w*\n(.*?)\n```', r'\1', text, flags=re.DOTALL)
+    # 5. 行内代码: `code` -> code
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+
+    # ── 第4层：内联格式（粗体/斜体/删除线）──
+    # 6. 粗体: **text** -> text
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    # 7. 斜体: *text* -> text（非贪婪，避免跨段误匹配）
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    # 8. 粗体/斜体 (下划线): __text__ -> text
+    text = re.sub(r'__([^_]+)__', r'\1', text)
+    # 9. 删除线: ~~text~~ -> text
+    text = re.sub(r'~~([^~]+)~~', r'\1', text)
+
+    # ── 第5层：块级标记（行首符号）──
+    # 10. 标题标记: # ## ### ... (行首)
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    # 11. 引用标记: > (行首)
+    text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
+    # 12. 无序列表: - * + (行首)
+    text = re.sub(r'^[\-\*\+]\s+', '', text, flags=re.MULTILINE)
+    # 13. 有序列表: 1. 2. (行首)
+    text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
+    # 14. 水平线: --- *** ___ (整行只有这些字符)
+    text = re.sub(r'^[\-\*\_]{3,}\s*$', '', text, flags=re.MULTILINE)
+
+    # ── 第6层：HTML 与表格 ──
+    # 15. HTML 标签: <br>, <b>, </b> 等
+    text = re.sub(r'<[^>]+>', '', text)
+    # 16. 表格分隔行: |---| 等（整行只有 |:-- 字符，先处理避免留空行）
+    text = re.sub(r'^[\|\s\-\:]+$', '', text, flags=re.MULTILINE)
+    # 17. 表格竖线: 替换为空格
+    text = re.sub(r'\|', ' ', text)
+
+    # ── 第7层：空白清理 ──
+    # 18. 清理多余空白
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r' {2,}', ' ', text)
+
+    return text.strip()
 
 
 async def speak_async(text: str) -> None:
@@ -165,7 +232,9 @@ def tts_say(text: str) -> None:
     """
     from repl.config_manager import get_config
     if get_config().get("tts_enabled", False) and text and text.strip():
-        text = text.strip()
+        text = _clean_markdown(text.strip())
+        if not text:
+            return
         try:
             # 主线程路径：直接在事件循环线程操作
             asyncio.get_running_loop()

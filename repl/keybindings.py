@@ -64,6 +64,54 @@ def _navigate_history(textarea, direction: str) -> None:
             textarea.buffer.cursor_position = len(textarea.buffer.text)
 
 
+def _register_picker_keybindings(kb, input_field, picker_filter, picker_state, actions: dict):
+    """注册 6 个通用 picker 按键绑定 (enter/escape/up/down/left/right)。
+
+    3 组 picker（会话/SOP/设置）共享同一套按键模式，仅 actions 回调不同。
+
+    Args:
+        kb: KeyBindings 对象
+        input_field: TextArea 输入控件
+        picker_filter: 该 picker 激活时的 Condition 过滤器
+        picker_state: Picker 状态 dict
+        actions: dict，键 "enter"/"escape"/"up"/"down"/"left"/"right"
+                 每个值为 callable(picker_state) -> None
+                 "left"/"right" 可为 None（跳过注册）
+    """
+    @kb.add("enter", filter=picker_filter & has_focus(input_field))
+    def _on_enter(event):
+        input_field.buffer.text = ""
+        actions["enter"](picker_state)
+        event.app.invalidate()
+
+    @kb.add("escape", filter=picker_filter & has_focus(input_field))
+    def _on_escape(event):
+        actions["escape"](picker_state)
+        event.app.invalidate()
+
+    @kb.add("up", filter=picker_filter)
+    def _on_up(event):
+        actions["up"](picker_state)
+        event.app.invalidate()
+
+    @kb.add("down", filter=picker_filter)
+    def _on_down(event):
+        actions["down"](picker_state)
+        event.app.invalidate()
+
+    if actions.get("left"):
+        @kb.add("left", filter=picker_filter)
+        def _on_left(event):
+            actions["left"](picker_state)
+            event.app.invalidate()
+
+    if actions.get("right"):
+        @kb.add("right", filter=picker_filter)
+        def _on_right(event):
+            actions["right"](picker_state)
+            event.app.invalidate()
+
+
 def create_keybindings(
     input_field,
     flags: dict,
@@ -155,121 +203,52 @@ def create_keybindings(
     def _on_history_down(event):
         _navigate_history(input_field, direction="down")
 
-    # ── 会话选择器按键：仅在 picker 激活时生效 ──
+    # ── 会话选择器按键 ──
     from repl.session_picker import (
         picker_select, picker_cancel,
         picker_move_up, picker_move_down,
         picker_page_left, picker_page_right,
     )
+    _register_picker_keybindings(kb, input_field, picker_filter, picker_state, {
+        "enter": picker_select,
+        "escape": picker_cancel,
+        "up": picker_move_up,
+        "down": picker_move_down,
+        "left": picker_page_left,
+        "right": picker_page_right,
+    })
 
-    @kb.add("enter", filter=picker_filter & has_focus(input_field))
-    def _on_picker_enter(event):
-        input_field.buffer.text = ""
-        picker_select(picker_state)
-        event.app.invalidate()
-
-    @kb.add("escape", filter=picker_filter & has_focus(input_field))
-    def _on_picker_escape(event):
-        picker_cancel(picker_state)
-        event.app.invalidate()
-
-    @kb.add("up", filter=picker_filter)
-    def _on_picker_up(event):
-        picker_move_up(picker_state)
-        event.app.invalidate()
-
-    @kb.add("down", filter=picker_filter)
-    def _on_picker_down(event):
-        picker_move_down(picker_state)
-        event.app.invalidate()
-
-    @kb.add("left", filter=picker_filter)
-    def _on_picker_left(event):
-        picker_page_left(picker_state)
-        event.app.invalidate()
-
-    @kb.add("right", filter=picker_filter)
-    def _on_picker_right(event):
-        picker_page_right(picker_state)
-        event.app.invalidate()
-
-    # ── SOP 选择器按键：仅在 SOP picker 激活时生效 ──
+    # ── SOP 选择器按键 ──
     if sop_picker_state is not None and sop_picker_filter is not None:
         from repl.sop_picker import (
             sop_picker_enter, sop_picker_cancel,
             sop_picker_move_up, sop_picker_move_down,
             sop_picker_page_left, sop_picker_page_right,
         )
+        _register_picker_keybindings(kb, input_field, sop_picker_filter, sop_picker_state, {
+            "enter": sop_picker_enter,
+            "escape": sop_picker_cancel,
+            "up": sop_picker_move_up,
+            "down": sop_picker_move_down,
+            "left": sop_picker_page_left,
+            "right": sop_picker_page_right,
+        })
 
-        @kb.add("enter", filter=sop_picker_filter & has_focus(input_field))
-        def _on_sop_picker_enter(event):
-            input_field.buffer.text = ""
-            sop_picker_enter(sop_picker_state)
-            event.app.invalidate()
-
-        @kb.add("escape", filter=sop_picker_filter & has_focus(input_field))
-        def _on_sop_picker_escape(event):
-            sop_picker_cancel(sop_picker_state)
-            event.app.invalidate()
-
-        @kb.add("up", filter=sop_picker_filter)
-        def _on_sop_picker_up(event):
-            sop_picker_move_up(sop_picker_state)
-            event.app.invalidate()
-
-        @kb.add("down", filter=sop_picker_filter)
-        def _on_sop_picker_down(event):
-            sop_picker_move_down(sop_picker_state)
-            event.app.invalidate()
-
-        @kb.add("left", filter=sop_picker_filter)
-        def _on_sop_picker_left(event):
-            sop_picker_page_left(sop_picker_state)
-            event.app.invalidate()
-
-        @kb.add("right", filter=sop_picker_filter)
-        def _on_sop_picker_right(event):
-            sop_picker_page_right(sop_picker_state)
-            event.app.invalidate()
-
-    # ── 全局设置选择器按键：仅在 config picker 激活时生效 ──
+    # ── 全局设置选择器按键 ──
     if config_picker_state is not None and config_picker_filter is not None:
         from repl.config_picker import (
             config_picker_enter, config_picker_cancel,
             config_picker_move_up, config_picker_move_down,
             config_picker_adjust,
         )
-
-        @kb.add("enter", filter=config_picker_filter & has_focus(input_field))
-        def _on_config_picker_enter(event):
-            input_field.buffer.text = ""
-            config_picker_enter(config_picker_state)
-            event.app.invalidate()
-
-        @kb.add("escape", filter=config_picker_filter & has_focus(input_field))
-        def _on_config_picker_escape(event):
-            config_picker_cancel(config_picker_state)
-            event.app.invalidate()
-
-        @kb.add("up", filter=config_picker_filter)
-        def _on_config_picker_up(event):
-            config_picker_move_up(config_picker_state)
-            event.app.invalidate()
-
-        @kb.add("down", filter=config_picker_filter)
-        def _on_config_picker_down(event):
-            config_picker_move_down(config_picker_state)
-            event.app.invalidate()
-
-        @kb.add("left", filter=config_picker_filter)
-        def _on_config_picker_left(event):
-            config_picker_adjust(config_picker_state, direction="left")
-            event.app.invalidate()
-
-        @kb.add("right", filter=config_picker_filter)
-        def _on_config_picker_right(event):
-            config_picker_adjust(config_picker_state, direction="right")
-            event.app.invalidate()
+        _register_picker_keybindings(kb, input_field, config_picker_filter, config_picker_state, {
+            "enter": config_picker_enter,
+            "escape": config_picker_cancel,
+            "up": config_picker_move_up,
+            "down": config_picker_move_down,
+            "left": lambda s: config_picker_adjust(s, direction="left"),
+            "right": lambda s: config_picker_adjust(s, direction="right"),
+        })
 
     # ── 命令提示按键：仅在 command hint 激活时生效 ──
     if command_hint_state is not None and command_hint_filter is not None:
