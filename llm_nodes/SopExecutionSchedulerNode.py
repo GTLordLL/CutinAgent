@@ -1,13 +1,22 @@
-import time
+"""SOP Execution Scheduler LLM 节点。
+
+在 SOP 执行循环中每轮运行：根据当前 SOP_PLAN 进度选择下一步工具调用。
+Thinker (temp 0.4) + Formatter (temp 0.0) 双阶段。
+
+特殊处理（相比其他 LLM 节点）：
+- 前置：INTERRUPT 恢复标记 + 工具过滤（仅允许 SOP 声明的工具）
+- 后置：多工具调用并行解析（| 分隔符）
+"""
+
 from datetime import date
 from rich.console import Console
 from parsers.tool_call import _build_tool_signature, _split_parallel_calls
 from parsers.sop_plan import _classify_step, StepType, _parse_steps, _reconstruct_plan
 from validator.SopExecutionSchedulerValidator import validate_tool_call, validate_scheduler_output
-from utils.debug_logger import log_node_io
-from utils.streaming import stream_llm
-from repl.config_manager import get_config
+from llm_nodes.thinker_formatter_runner import run_thinker_formatter
 
+
+# ── 模块级辅助函数 ──
 
 def _handle_interrupt_resume(sop_plan_steps: str) -> str:
     """检测 SOP_PLAN 中未标记的 INTERRUPT 步骤并标记为已完成。
@@ -22,7 +31,6 @@ def _handle_interrupt_resume(sop_plan_steps: str) -> str:
 
     for s in steps:
         if _classify_step(s['header']) == StepType.INTERRUPT:
-            # 检查是否已标记（含有"结果:"、"中断已完成"等）
             if "结果:" not in s['header'] and "中断已完成" not in s['header']:
                 s['header'] = f"{s['header']} 中断已完成，请继续执行。"
                 s['sub_lines'] = []
@@ -45,32 +53,27 @@ def _parse_multiple_tool_calls(tool_call_raw: str, valid_tool_ids: set) -> list[
     return calls
 
 
+# ── 节点工厂 ──
+
 def sop_execution_scheduler_node(resources, headless=False):
-    thinker_llm = resources.get_llm("sop_execution_scheduler_thinker")
-    formatter_llm = resources.get_llm("all_formatter")
-    thinker_prompt = resources.prompts["sop_execution_scheduler_thinker"]
-    formatter_prompt = resources.prompts["sop_execution_scheduler_formatter"]
+    """SOP Execution Scheduler 可调用对象工厂。
+
+    Args:
+        resources: LLMResources 实例
+        headless: True 时禁用终端输出（CLI 模式）
+    """
     tools_df = resources.tools_df
     _console = None if headless else Console()
 
     def node(state: dict) -> dict:
-        cfg = get_config()
-        buf_interval = float(cfg["stream_buffer_interval"])
-        silent = _console is None
-        t_start = time.time()
-        round_num = state.get("current_round", 0)
-        user_instruction = state.get("user_instruction", "")
+        # ── 前置：INTERRUPT 恢复标记 ──
         sop_plan_steps = state.get("sop_plan_steps", "")
-        sop_exception_handling = state.get("sop_exception_handling", "")
-        sop_tools_required = state.get("sop_tools_required", "")
-        last_step = state.get("last_step", "")
-
-        # --- INTERRUPT resume: pre-mark INTERRUPT step before Thinker sees it ---
         prev_task_status = state.get("task_status", "")
         if prev_task_status == "INTERRUPT":
             sop_plan_steps = _handle_interrupt_resume(sop_plan_steps)
 
-        # --- Filter tools by sop_tools_required ---
+        # ── 前置：工具过滤（仅允许 SOP 声明的工具）──
+        sop_tools_required = state.get("sop_tools_required", "")
         if sop_tools_required:
             required_ids = {t.strip() for t in sop_tools_required.split(",")}
             filtered = tools_df[tools_df["Tool_ID"].isin(required_ids)]
@@ -83,105 +86,66 @@ def sop_execution_scheduler_node(resources, headless=False):
             tools_lines.append(_build_tool_signature(row))
         tools_text = "\n".join(tools_lines)
 
-        # --- Thinker ---
+        user_instruction = state.get("user_instruction", "")
+        sop_exception_handling = state.get("sop_exception_handling", "")
+        last_step = state.get("last_step", "")
         today_str = date.today().isoformat()
-        thinker_input = (
-            f"TODAY: {today_str}\n\n"
-            f"USER_INSTRUCTION: {user_instruction}\n\n"
-            f"SOP_PLAN:\n{sop_plan_steps}\n\n"
-            f"EXCEPTION_HANDLING:\n{sop_exception_handling}\n\n"
-            f"LAST_STEP: {last_step}\n\n"
-            f"AVAILABLE_TOOLS:\n{tools_text}\n"
-        )
 
-        thinker_raw = (
-            f"<|im_start|>system\n{thinker_prompt}<|im_end|>\n"
-            f"<|im_start|>user\n{thinker_input}<|im_end|>\n"
-            f"<|im_start|>assistant\n"
-        )
-
-        if _console:
-            _console.out("  [Scheduler Thinker] ", style="dim")
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim", silent=silent)
-
-        # --- Formatter with retries ---
-        max_retries = 3
-        retries = 0
-        tool_id = ""
-        tool_args = {}
-        tool_call_raw = ""
-        tool_calls_list = []
-        last_step_out = ""
-        task_status = "ONGOING"
-        formatter_logs = []
-        formatter_tokens_list = []
-
-        formatter_base = (
-            f"<|im_start|>system\n{formatter_prompt}<|im_end|>\n"
-            f"<|im_start|>user\nTHINKING_PROCESS:\n{reasoning_chain}\n<|im_end|>\n"
-            f"<|im_start|>assistant\n"
-        )
-        current_prompt = formatter_base
-
-        while retries < max_retries:
-            retry_label = " (retry)" if retries > 0 else ""
-            if _console:
-                _console.out(f"\n  [Scheduler Formatter{retry_label}] ", style="dim")
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=buf_interval, console=_console, style="dim", silent=silent)
-            if fmt_tokens:
-                formatter_tokens_list.append(fmt_tokens)
-
-            is_valid, error_reason, parsed = validate_scheduler_output(raw_output, valid_tool_ids)
-            formatter_logs.append({
-                "retry": retries,
-                "output": raw_output,
-                "valid": is_valid,
-                "reason": error_reason if not is_valid else ""
-            })
-
-            if is_valid:
-                last_step_out = parsed["next_step"]
-                tool_call_raw = parsed["tool_call"]
-                task_status = parsed["task_status"]
-
-                # Parse tool calls for ToolExecutor (skip for terminal states)
-                if tool_call_raw != "None" and task_status == "ONGOING":
-                    tool_calls_list = _parse_multiple_tool_calls(
-                        tool_call_raw, valid_tool_ids
-                    )
-                    if tool_calls_list:
-                        tool_id = tool_calls_list[0]["tool_id"]
-                        tool_args = tool_calls_list[0]["args"]
-                break
-
-            retries += 1
-            current_prompt += (
-                f"{raw_output}<|im_end|>\n"
-                f"<|im_start|>user\n格式输出错误，原因：{error_reason}<|im_end|>\n"
-                f"<|im_start|>assistant\n"
+        def build_input(s):
+            return (
+                f"TODAY: {today_str}\n\n"
+                f"USER_INSTRUCTION: {user_instruction}\n\n"
+                f"SOP_PLAN:\n{sop_plan_steps}\n\n"
+                f"EXCEPTION_HANDLING:\n{sop_exception_handling}\n\n"
+                f"LAST_STEP: {last_step}\n\n"
+                f"AVAILABLE_TOOLS:\n{tools_text}\n"
             )
 
-        result = {
-            "current_tool_call": tool_id,
-            "current_tool_call_raw": tool_call_raw if tool_call_raw else raw_output.strip(),
-            "current_tool_args": tool_args,
-            "current_tool_calls": tool_calls_list,
-            "last_step": last_step_out,
-            "task_status": task_status,
-        }
+        def map_result(parsed, thinker_tokens, **ctx):
+            tool_call_raw = parsed.get("tool_call", "")
+            task_status = parsed.get("task_status", "ONGOING")
+            v_tool_ids = ctx.get("valid_tool_ids", set())
 
-        log_node_io(
+            tool_id = ""
+            tool_args = {}
+            tool_calls_list = []
+
+            if tool_call_raw != "None" and task_status == "ONGOING":
+                tool_calls_list = _parse_multiple_tool_calls(tool_call_raw, v_tool_ids)
+                if tool_calls_list:
+                    tool_id = tool_calls_list[0]["tool_id"]
+                    tool_args = tool_calls_list[0]["args"]
+
+            return {
+                "current_tool_call": tool_id,
+                "current_tool_call_raw": tool_call_raw or "",
+                "current_tool_args": tool_args,
+                "current_tool_calls": tool_calls_list,
+                "last_step": parsed.get("next_step", ""),
+                "task_status": task_status,
+            }
+
+        return run_thinker_formatter(
+            state=state,
+            resources=resources,
+            thinker_llm_key="sop_execution_scheduler_thinker",
+            formatter_llm_key="all_formatter",
+            thinker_prompt_key="sop_execution_scheduler_thinker",
+            formatter_prompt_key="sop_execution_scheduler_formatter",
             node_name="SopExecutionScheduler",
-            round_num=round_num,
-            thinker_input=thinker_input,
-            reasoning_chain=reasoning_chain,
-            formatter_logs=formatter_logs,
-            final_result=result,
-            session_dir=state.get("session_dir", ""),
-            elapsed_seconds=time.time() - t_start,
-            token_usage={"thinker": thinker_tokens, "formatter": formatter_tokens_list},
+            build_thinker_input=build_input,
+            validate_output=validate_scheduler_output,
+            map_result=map_result,
+            fallback_result={
+                "next_step": "",
+                "tool_call": "",
+                "task_status": "FAILED",
+            },
+            thinker_label="Scheduler Thinker",
+            formatter_label="Scheduler Formatter",
+            console=_console,
+            headless=headless,
+            valid_tool_ids=valid_tool_ids,
         )
-
-        return result
 
     return node
