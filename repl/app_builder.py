@@ -147,6 +147,17 @@ def create_status_bar(default_text: str = "CutinAgent REPL — /help 查看命�
     return FormattedTextControl(_get_status), status_data
 
 
+def _add_conditional_picker(elements: list, control, filter_obj, height: int) -> None:
+    """向 elements 追加 ConditionalContainer（如果 control 和 filter 都存在）。"""
+    if control is not None and filter_obj is not None:
+        elements.append(
+            ConditionalContainer(
+                content=Window(content=control, height=height, style="class:status"),
+                filter=filter_obj,
+            ),
+        )
+
+
 def create_root_container(input_field: TextArea, top_status_control: FormattedTextControl,
                          top_status_data: dict,
                          bottom_status_control: FormattedTextControl,
@@ -190,36 +201,16 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
             ),
         ]
         if has_picker:
-            bottom_elements.append(
-                ConditionalContainer(
-                    content=Window(content=picker_control, height=8, style="class:status"),
-                    filter=picker_filter,
-                ),
-            )
+            _add_conditional_picker(bottom_elements, picker_control, picker_filter, 8)
         if has_sop_picker:
             from repl.sop_picker import SOP_PICKER_HEIGHT
-            bottom_elements.append(
-                ConditionalContainer(
-                    content=Window(content=sop_picker_control, height=SOP_PICKER_HEIGHT, style="class:status"),
-                    filter=sop_picker_filter,
-                ),
-            )
+            _add_conditional_picker(bottom_elements, sop_picker_control, sop_picker_filter, SOP_PICKER_HEIGHT)
         if has_config_picker:
             from repl.config_picker import CONFIG_PICKER_HEIGHT
-            bottom_elements.append(
-                ConditionalContainer(
-                    content=Window(content=config_picker_control, height=CONFIG_PICKER_HEIGHT, style="class:status"),
-                    filter=config_picker_filter,
-                ),
-            )
+            _add_conditional_picker(bottom_elements, config_picker_control, config_picker_filter, CONFIG_PICKER_HEIGHT)
         if has_command_hint:
             from repl.command_hint import COMMAND_HINT_HEIGHT
-            bottom_elements.append(
-                ConditionalContainer(
-                    content=Window(content=command_hint_control, height=COMMAND_HINT_HEIGHT, style="class:status"),
-                    filter=command_hint_filter,
-                ),
-            )
+            _add_conditional_picker(bottom_elements, command_hint_control, command_hint_filter, COMMAND_HINT_HEIGHT)
     else:
         bottom_elements = [
             Window(height=1, char="─", style="dim"),

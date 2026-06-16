@@ -36,23 +36,23 @@ def _check_interrupt_in_text(text: str, step_type: StepType) -> bool:
     return not (interrupt_outside or error_outside)
 
 
-# ── main checker ─────────────────────────────────────────
+# ── Pass 1: per-step validation ──────────────────────────
 
-def check_sop_plan_steps(
-    plan_steps_text: str,
+def _validate_step_lines(
+    lines: list[str],
     valid_tool_ids: set[str],
-) -> list[SopSpecError]:
-    """校验 Plan_Steps 是否符合严格 DSL 格式。
-    Returns: 错误列表。空列表 = 合法。
+) -> tuple[list[SopSpecError], list[tuple[int, str, StepType]], set[int], int]:
+    """逐行解析 Plan_Steps 并校验每条步骤的格式和规则。
+
+    Returns:
+        (errors, parsed, step_numbers, max_step)
+        parsed: list of (step_number, raw_text, step_type)
     """
     errors: list[SopSpecError] = []
-    lines = plan_steps_text.strip().split('\n')
-
-    parsed: list[tuple[int, str, StepType]] = []  # (num, raw_text, type)
+    parsed: list[tuple[int, str, StepType]] = []
     step_numbers: set[int] = set()
     max_step = 0
 
-    # ── Pass 1: parse each line ──
     for idx, raw_line in enumerate(lines):
         line = raw_line.strip()
         if not line:
@@ -71,7 +71,6 @@ def check_sop_plan_steps(
         text = m.group(2).strip()
         step_type = _classify_step(text)
 
-        # 序号不能重复
         if num in step_numbers:
             errors.append(SopSpecError(
                 ln, num,
@@ -80,7 +79,6 @@ def check_sop_plan_steps(
         step_numbers.add(num)
         max_step = max(max_step, num)
 
-        # 未知类型
         if step_type == StepType.UNKNOWN:
             errors.append(SopSpecError(
                 ln, num,
@@ -88,7 +86,6 @@ def check_sop_plan_steps(
                 f"必须包含 '调用'/'如果...就'/'同时调用'/'FINISH' 之一"
             ))
 
-        # INTERRUPT/ERROR 不在允许位置
         if not _check_interrupt_in_text(text, step_type):
             errors.append(SopSpecError(
                 ln, num,
@@ -96,7 +93,6 @@ def check_sop_plan_steps(
                 f"仅允许作为终止步骤或条件分支内的 INTERRUPT"
             ))
 
-        # 提取并校验工具 ID
         tool_ids = _extract_tool_ids(text)
         for tid in tool_ids:
             if tid not in valid_tool_ids:
@@ -105,21 +101,18 @@ def check_sop_plan_steps(
                     f"工具 ID '{tid}' 不在 tools.csv 中"
                 ))
 
-        # 顺序步骤必须至少引用一个工具
         if step_type == StepType.SEQUENTIAL and not tool_ids:
             errors.append(SopSpecError(
                 ln, num,
                 f"顺序步骤必须包含 '调用 tool_id(...)' 格式的工具调用"
             ))
 
-        # 并行步骤最多 3 个工具
         if step_type == StepType.PARALLEL and len(tool_ids) > 3:
             errors.append(SopSpecError(
                 ln, num,
                 f"并行步骤最多同时调用 3 个工具，当前 {len(tool_ids)} 个"
             ))
 
-        # 条件步骤必须有 "如果...就" 模式
         if step_type == StepType.CONDITIONAL:
             if not re.search(r'如果.+就', text):
                 errors.append(SopSpecError(
@@ -129,7 +122,21 @@ def check_sop_plan_steps(
 
         parsed.append((num, text, step_type))
 
-    # ── Pass 2: global checks ──
+    return errors, parsed, step_numbers, max_step
+
+
+# ── Pass 2: global constraints ────────────────────────────
+
+def _validate_global_constraints(
+    parsed: list[tuple[int, str, StepType]],
+    step_numbers: set[int],
+    max_step: int,
+) -> list[SopSpecError]:
+    """全局约束校验：连续性、FINISH 终止标记等。
+
+    允许多个 FINISH（条件分支中可提前 FINISH），只要最后一步是 FINISH 即可。
+    """
+    errors: list[SopSpecError] = []
 
     if not parsed:
         errors.append(SopSpecError(0, 0, "Plan_Steps 为空"))
@@ -157,8 +164,24 @@ def check_sop_plan_steps(
     finish_count = sum(1 for _, _, t in parsed if t == StepType.FINISH)
     if finish_count == 0:
         errors.append(SopSpecError(0, 0, "Plan_Steps 缺少 FINISH 终止标记"))
-    # 允许多个 FINISH：条件分支中可提前 FINISH，只要最后一步是 FINISH 即可
 
+    return errors
+
+
+# ── main checker ─────────────────────────────────────────
+
+def check_sop_plan_steps(
+    plan_steps_text: str,
+    valid_tool_ids: set[str],
+) -> list[SopSpecError]:
+    """校验 Plan_Steps 是否符合严格 DSL 格式。
+    Returns: 错误列表。空列表 = 合法。
+    """
+    lines = plan_steps_text.strip().split('\n')
+    errors, parsed, step_numbers, max_step = _validate_step_lines(
+        lines, valid_tool_ids
+    )
+    errors.extend(_validate_global_constraints(parsed, step_numbers, max_step))
     return errors
 
 
