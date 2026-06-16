@@ -177,7 +177,7 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
                 any_picker = f if any_picker is None else any_picker | f
 
         bottom_elements = [
-            Window(height=1, char="─"),
+            Window(height=1, char="─", style="dim"),
             ConditionalContainer(
                 content=Window(content=bottom_status_control, height=2, style="class:status"),
                 filter=~any_picker,
@@ -216,7 +216,7 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
             )
     else:
         bottom_elements = [
-            Window(height=1, char="─"),
+            Window(height=1, char="─", style="dim"),
             Window(content=bottom_status_control, height=2, style="class:status"),
         ]
 
@@ -229,7 +229,7 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
             content=Window(height=1, char=" "),
             filter=~has_runtime,
         ),
-        Window(height=1, char="─"),
+        Window(height=1, char="─", style="dim"),
         input_field,
         *bottom_elements,
     ])
