@@ -13,7 +13,7 @@ _DEFAULTS = {
     "auto_compact_threshold": 4096,
     "stream_buffer_interval": 2,
     "input_max_lines": 10,
-    "analyzer_enabled": True,
+    "analyzer_enabled": False,
     "analyzer_max_rounds": 3,
     "tts_enabled": True,
     "tts_voice": "zh-CN-XiaoxiaoNeural",

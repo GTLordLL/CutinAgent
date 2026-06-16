@@ -41,6 +41,7 @@ from repl import (
     create_config_picker_control,
     # Config
     get_config,
+    apply_config,
     # Command Hint
     create_command_hint_state,
     get_command_hint_condition,
@@ -152,6 +153,12 @@ async def run_repl():
         )
         app.invalidate()
 
+    def _sync_analysis_indicator():
+        """同步分析模式指示器到状态栏。"""
+        cfg = get_config()
+        status_data["analysis_mode"] = cfg.get("analyzer_enabled", False)
+        app.invalidate()
+
     async def _wait_confirm() -> str:
         flags["waiting_confirm"] = True
         confirm_event.clear()
@@ -163,6 +170,19 @@ async def run_repl():
         # patch_stdout：所有输出自动渲染到 Application 上方
         with patch_stdout(raw=True):
             try:
+                # --- /analyse <message> → 开启分析员并处理消息 -------------
+                # 在命令分发前拦截，使其作为普通消息走完整流程
+                _analyse_parts = user_msg.strip().split(maxsplit=1)
+                if (len(_analyse_parts) > 1
+                        and _analyse_parts[0].lower() == "/analyse"
+                        and _analyse_parts[1].strip()):
+                    cfg = get_config()
+                    if not cfg.get("analyzer_enabled", False):
+                        apply_config({"analyzer_enabled": True})
+                        _sync_analysis_indicator()
+                        console.print("[dim]问题分析员模式已临时开启。[/dim]")
+                    user_msg = _analyse_parts[1].strip()
+
                 # --- / 命令分发 --------------------------------------------------
                 handled, msg, should_exit = dispatch_repl_command(
                     user_msg, state, resources
@@ -220,6 +240,16 @@ async def run_repl():
                             console.print("[dim]设置未更改。[/dim]")
                         return
 
+                    # /analyse → 切换问题分析员模式
+                    if msg == CmdSignal.ANALYSE_TOGGLE:
+                        cfg = get_config()
+                        new_val = not cfg.get("analyzer_enabled", False)
+                        apply_config({"analyzer_enabled": new_val})
+                        _sync_analysis_indicator()
+                        status_text = "开启" if new_val else "关闭"
+                        print_command_result(console, f"问题分析员模式已{status_text}。")
+                        return
+
                     # /compact → 手动压缩
                     if user_msg.strip().lower().startswith("/compact"):
                         await run_chat_compactor(
@@ -251,7 +281,7 @@ async def run_repl():
 
                 # --- Problem Analyzer (v0.2) -----------------------------------
                 cfg = get_config()
-                if cfg.get("analyzer_enabled", True):
+                if cfg.get("analyzer_enabled", False):
                     analyzer_rounds = 0
                     max_rounds = int(cfg.get("analyzer_max_rounds", 3))
 
@@ -324,6 +354,23 @@ async def run_repl():
 
                     state["analyzer_rounds_used"] = analyzer_rounds
 
+                    # 将分析结果合并追加到对话历史，供 UserCoordinator 参考
+                    _as = state.get("analyzer_current_state", "")
+                    _au = state.get("analyzer_my_understanding", "")
+                    if _as or _au:
+                        _parts = []
+                        if _as:
+                            _parts.append(f"当前状态: {_as}")
+                        if _au:
+                            _parts.append(f"推断意图: {_au}")
+                        _analyzer_msg = "\n".join(_parts)
+                        state["current_dialogue"].append(
+                            {"role": "analyzer", "content": _analyzer_msg}
+                        )
+                        console.print(
+                            f"[dim][ProblemAnalyzer] 分析结果已追加到对话历史[/dim]"
+                        )
+
                 # --- UserCoordinator -------------------------------------------
                 _set_status("分析中...")
                 console.print("[dim][UserCoordinator] 分析中...[/dim]")
@@ -388,6 +435,17 @@ async def run_repl():
     )
 
     app = build_application(layout, kb)
+
+    # Shift+Tab → 切换分析模式（状态栏指示器已反馈，无需 console.print）
+    @kb.add("s-tab")
+    def _toggle_analysis(event):
+        cfg = get_config()
+        new_val = not cfg.get("analyzer_enabled", False)
+        apply_config({"analyzer_enabled": new_val})
+        _sync_analysis_indicator()
+
+    # 初始化分析模式指示器
+    _sync_analysis_indicator()
 
     # ── 12. 启动 Application ────────────────────────────────────
     try:

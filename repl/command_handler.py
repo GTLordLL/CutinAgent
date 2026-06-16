@@ -2,7 +2,7 @@ from prompt_toolkit.completion import Completer, Completion
 from utils.sop_loader import build_sop_library_index
 from repl.dialogue_utils import dialogue_to_text
 
-REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/config", "/resume", "/exit", "/quit"]
+REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/config", "/resume", "/exit", "/quit", "/analyse"]
 
 
 class CmdSignal:
@@ -16,6 +16,7 @@ class CmdSignal:
     LOAD_SESSION_PREFIX = "load_session:"
     SHOW_SOP_PICKER = "show_sop_picker"
     SHOW_CONFIG_PICKER = "show_config_picker"
+    ANALYSE_TOGGLE = "analyse_toggle"
 
 
 class ReplCompleter(Completer):
@@ -65,6 +66,9 @@ def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
     if name == "/config":
         return True, CmdSignal.SHOW_CONFIG_PICKER, False
 
+    if name == "/analyse":
+        return True, CmdSignal.ANALYSE_TOGGLE, False
+
 
     return False, None, False
 
@@ -80,6 +84,7 @@ def _build_help_message(resources) -> str:
         "| `/sops` | 列出所有可用 SOP (可以选择) |",
         "| `/history` | 显示当前对话与执行历史摘要 |\n"
         "| `/compact [提示]` | 手动压缩对话上下文，可附带压缩要求 |\n"
+        "| `/analyse` | 开启/关闭问题分析员模式，自动收集信息辅助诊断 |\n"
         "| `/config` | 修改全局运行时设置（阈值/缓冲/行数/TTS） |",
         "| `/clear` | 保存当前会话并开始新会话 |",
         "| `/resume` | 打开会话选择器，恢复历史会话 |",

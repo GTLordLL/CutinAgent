@@ -7,6 +7,7 @@ current_dialogue 格式: list[dict]
 ROLE_PREFIX = {
     "user": "User",
     "agent": "Agent",
+    "analyzer": "Analyzer",
     "feedback": "User (feedback)",
     "error": "Agent (error)",
 }
@@ -47,6 +48,11 @@ def parse_dialogue_text(text: str) -> list[dict]:
             messages.append({
                 "role": "feedback",
                 "content": line[len("User (feedback):"):].strip(),
+            })
+        elif line.startswith("Analyzer:"):
+            messages.append({
+                "role": "analyzer",
+                "content": line[len("Analyzer:"):].strip(),
             })
         elif line.startswith("Agent (error):"):
             messages.append({

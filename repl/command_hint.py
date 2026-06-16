@@ -11,8 +11,8 @@ FormattedTextControl + ConditionalContainer 模式，但它是一个 **非模态
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.filters import Condition
 
-# 9 行命令 + 1 标题 + 1 底部提示
-COMMAND_HINT_HEIGHT = 11
+# 10 行命令 + 1 标题 + 1 底部提示
+COMMAND_HINT_HEIGHT = 12
 
 # 命令描述映射（与 command_handler._build_help_message 保持一致）
 _COMMAND_DESCRIPTIONS = {
@@ -23,6 +23,7 @@ _COMMAND_DESCRIPTIONS = {
     "/compact": "手动压缩对话上下文",
     "/config":  "修改全局运行时设置",
     "/resume":  "打开会话选择器，恢复历史会话",
+    "/analyse": "开启/关闭问题分析员模式，自动收集信息辅助诊断",
     "/exit":    "退出 REPL",
     "/quit":    "退出 REPL",
 }
