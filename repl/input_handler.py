@@ -94,6 +94,26 @@ async def handle_user_input(ctx: REPLContext, user_msg: str) -> None:
 
 # ── 命令分发 ──────────────────────────────────────────────────
 
+async def _handle_config_picker_command(ctx: REPLContext) -> None:
+    """激活配置选择器，等待用户操作，显示结果。"""
+    from repl.config_picker import activate_config_picker, deactivate_config_picker
+    from repl import print_command_result
+
+    activate_config_picker(ctx.config_picker_state)
+    ctx.app.invalidate()
+
+    await ctx.config_picker_state["result_event"].wait()
+    result = deactivate_config_picker(ctx.config_picker_state)
+    ctx.app.invalidate()
+
+    if result.get("action") == "save":
+        print_command_result(ctx.console, "设置已保存。")
+    elif result.get("action") == "reset":
+        print_command_result(ctx.console, "设置已恢复为默认值。")
+    else:
+        ctx.console.print("[dim]设置未更改。[/dim]")
+
+
 async def _handle_command(ctx: REPLContext, user_msg: str) -> tuple[bool, str]:
     """分发 / 开头的 REPL 命令。返回 (是否已处理, 原因)。
 
@@ -151,22 +171,7 @@ async def _handle_command(ctx: REPLContext, user_msg: str) -> tuple[bool, str]:
 
     # /config → 全局设置
     if msg == CmdSignal.SHOW_CONFIG_PICKER:
-        from repl.config_picker import (
-            activate_config_picker, deactivate_config_picker,
-        )
-        activate_config_picker(ctx.config_picker_state)
-        ctx.app.invalidate()
-
-        await ctx.config_picker_state["result_event"].wait()
-        result = deactivate_config_picker(ctx.config_picker_state)
-        ctx.app.invalidate()
-
-        if result.get("action") == "save":
-            print_command_result(ctx.console, "设置已保存。")
-        elif result.get("action") == "reset":
-            print_command_result(ctx.console, "设置已恢复为默认值。")
-        else:
-            ctx.console.print("[dim]设置未更改。[/dim]")
+        await _handle_config_picker_command(ctx)
         return (True, "config")
 
     # /analyse → 切换问题分析员模式
@@ -227,6 +232,62 @@ async def _handle_normal_message(ctx: REPLContext, user_msg: str) -> None:
     await _run_coordinator_and_execute(ctx)
 
 
+# ── 问题分析员辅助 ────────────────────────────────────────────
+
+async def _execute_analyzer_tool_calls(
+    ctx: REPLContext, tool_call: str, round_num: int
+) -> None:
+    """解析并行工具调用并执行，结果追加到 execution_history。"""
+    from parsers.tool_call import _split_parallel_calls, parse_single_call
+
+    calls = _split_parallel_calls(tool_call)
+    repl_set_status(ctx, f"执行工具: {tool_call[:50]}...")
+    for call_str in calls:
+        parsed = parse_single_call(call_str)
+        if parsed is None:
+            ctx.console.print(
+                f"[dim][ProblemAnalyzer] 工具调用解析失败: "
+                f"{call_str[:60]}[/dim]"
+            )
+            continue
+        tool_id, args = parsed
+        ctx.console.print(
+            f"[dim][ProblemAnalyzer] 执行: {tool_id}"
+            f"({', '.join(f'{k}={v}' for k, v in args.items())})[/dim]"
+        )
+        result = ctx.tool_dispatcher.dispatch(tool_id, args)
+        exec_entry = (
+            f"[Analyzer Round {round_num}] "
+            f"{tool_id}({', '.join(f'{k}={v}' for k, v in args.items())}): "
+            f"status=\"{result.get('status', '?')}\", "
+            f"summary=\"{result.get('summary', result.get('conclusion', ''))[:200]}\""
+        )
+        current_exec = ctx.state.get("execution_history", "")
+        ctx.state["execution_history"] = (
+            current_exec + "\n" + exec_entry if current_exec else exec_entry
+        )
+
+
+def _append_analyzer_result(ctx: REPLContext) -> None:
+    """将问题分析结果合并追加到对话历史。"""
+    _as = ctx.state.get("analyzer_current_state", "")
+    _au = ctx.state.get("analyzer_my_understanding", "")
+    if not _as and not _au:
+        return
+    _parts = []
+    if _as:
+        _parts.append(f"当前状态: {_as}")
+    if _au:
+        _parts.append(f"推断意图: {_au}")
+    _analyzer_msg = "\n".join(_parts)
+    ctx.state["current_dialogue"].append(
+        {"role": "analyzer", "content": _analyzer_msg}
+    )
+    ctx.console.print(
+        "[dim][ProblemAnalyzer] 分析结果已追加到对话历史[/dim]"
+    )
+
+
 # ── 问题分析员循环 ────────────────────────────────────────────
 
 async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
@@ -238,7 +299,6 @@ async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
     """
     from repl.config_manager import get_config
     from repl.llm_runner import run_llm_node
-    from parsers.tool_call import _split_parallel_calls, parse_single_call
 
     cfg = get_config()
     if not cfg.get("analyzer_enabled", False):
@@ -281,57 +341,11 @@ async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
             ctx.console.print("[dim][ProblemAnalyzer] 无工具调用，退出分析循环。[/dim]")
             break
 
-        # 解析并行调用，执行工具
-        calls = _split_parallel_calls(tool_call)
-        repl_set_status(ctx, f"执行工具: {tool_call[:50]}...")
-        for call_str in calls:
-            parsed = parse_single_call(call_str)
-            if parsed is None:
-                ctx.console.print(
-                    f"[dim][ProblemAnalyzer] 工具调用解析失败: "
-                    f"{call_str[:60]}[/dim]"
-                )
-                continue
-            tool_id, args = parsed
-            ctx.console.print(
-                f"[dim][ProblemAnalyzer] 执行: {tool_id}"
-                f"({', '.join(f'{k}={v}' for k, v in args.items())})[/dim]"
-            )
-            result = ctx.tool_dispatcher.dispatch(tool_id, args)
-            # 追加工具执行结果到 execution_history
-            exec_entry = (
-                f"[Analyzer Round {analyzer_rounds + 1}] "
-                f"{tool_id}({', '.join(f'{k}={v}' for k, v in args.items())}): "
-                f"status=\"{result.get('status', '?')}\", "
-                f"summary=\"{result.get('summary', result.get('conclusion', ''))[:200]}\""
-            )
-            current_exec = ctx.state.get("execution_history", "")
-            ctx.state["execution_history"] = (
-                current_exec + "\n" + exec_entry
-                if current_exec
-                else exec_entry
-            )
-
+        await _execute_analyzer_tool_calls(ctx, tool_call, analyzer_rounds + 1)
         analyzer_rounds += 1
 
     ctx.state["analyzer_rounds_used"] = analyzer_rounds
-
-    # 将分析结果合并追加到对话历史
-    _as = ctx.state.get("analyzer_current_state", "")
-    _au = ctx.state.get("analyzer_my_understanding", "")
-    if _as or _au:
-        _parts = []
-        if _as:
-            _parts.append(f"当前状态: {_as}")
-        if _au:
-            _parts.append(f"推断意图: {_au}")
-        _analyzer_msg = "\n".join(_parts)
-        ctx.state["current_dialogue"].append(
-            {"role": "analyzer", "content": _analyzer_msg}
-        )
-        ctx.console.print(
-            f"[dim][ProblemAnalyzer] 分析结果已追加到对话历史[/dim]"
-        )
+    _append_analyzer_result(ctx)
 
 
 # ── 协调器 + SOP 执行 ─────────────────────────────────────────

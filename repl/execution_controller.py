@@ -26,83 +26,109 @@ from repl.execution_helpers import (
 )
 
 
-async def execute_sop_flow(
+# ── Phase 1: 最终确认 ─────────────────────────────────────────────
+
+async def _confirm_execution(
     state: dict,
-    resources,
-    app_graph,
-    valid_tool_ids: set,
-    task_compactor_fn,
-    session_dir: str,
-    top_status_data: dict,
-    status_data: dict,
-    app,
+    is_resume: bool,
     console: Console,
     set_status_fn,
     wait_confirm_fn,
-) -> dict:
-    """执行完整的 SOP 流程：确认 → 加载 → 执行图 → TaskCompactor → 满意度。
+) -> dict | None:
+    """向用户确认 SOP 执行。恢复模式下跳过。
 
-    此函数封装了 IS_EXECUTE="true" 后的全部逻辑（原 main.py L437-L563）。
-    state 被原地修改并返回。
-
-    Args:
-        set_status_fn: 更新底部状态栏的回调，签名 (text: str) -> None
-        wait_confirm_fn: 等待用户输入的回调，签名 () -> str
+    Returns:
+        None → 确认执行，继续
+        {"feedback": ...} → 用户拒绝或提供反馈，调用方应直接返回该 dict
     """
-    # ── 0. INTERRUPT 恢复检测 ──
-    is_resume = detect_interrupt_resume(state)
-
-    saved_sop_id = state["matched_sop_id"]
-    saved_action = state["current_action"]
-    saved_long_term = state["long_term_intent"]
-
-    # ── 1. 最终确认（恢复模式下跳过） ──
-    if not is_resume:
-        console.print(Panel(
-            f"[bold]确认执行[/bold]\n"
-            f"SOP: {state['matched_sop_id']}\n"
-            f"行动: {state['current_action']}\n"
-            f"长期计划: {state['long_term_intent']}",
-            title="确认", title_align="left", padding=(0, 1),
-        ))
-        set_status_fn("确认执行? (y=执行 / n=重新规划 / 或输入补充信息)")
-
-        confirm = await wait_confirm_fn()
-        if confirm.lower() != 'y':
-            if confirm.lower() != 'n':
-                # 用户提供了补充信息 → 清除 INTERRUPT 状态，作为反馈返回
-                state["task_status"] = "ONGOING"
-                return {"feedback": confirm}
-            else:
-                # 用户选择 n → 清除 INTERRUPT 状态
-                state["task_status"] = "ONGOING"
-                set_status_fn("请重新描述需求")
-                new_msg = await wait_confirm_fn()
-                return {"feedback": new_msg or ""}
-
-    # ── 2. 加载 SOP（恢复模式下保留已有进度） ──
     if is_resume:
-        # 保留 sop_plan_steps（含进度标记）和 task_status="INTERRUPT"
-        # _handle_interrupt_resume 会在 Scheduler 启动时标记 INTERRUPT 步骤
+        return None
+
+    console.print(Panel(
+        f"[bold]确认执行[/bold]\n"
+        f"SOP: {state['matched_sop_id']}\n"
+        f"行动: {state['current_action']}\n"
+        f"长期计划: {state['long_term_intent']}",
+        title="确认", title_align="left", padding=(0, 1),
+    ))
+    set_status_fn("确认执行? (y=执行 / n=重新规划 / 或输入补充信息)")
+
+    confirm = await wait_confirm_fn()
+    if confirm.lower() != 'y':
+        state["task_status"] = "ONGOING"
+        if confirm.lower() != 'n':
+            return {"feedback": confirm}
+        set_status_fn("请重新描述需求")
+        new_msg = await wait_confirm_fn()
+        return {"feedback": new_msg or ""}
+
+    return None
+
+
+# ── Phase 2: 加载 SOP ─────────────────────────────────────────────
+
+def _load_sop_for_execution(
+    state: dict,
+    resources,
+    valid_tool_ids: set,
+    is_resume: bool,
+    saved_action: str,
+    saved_long_term: str,
+    console: Console,
+) -> dict | None:
+    """加载 SOP markdown 并填充 state 字段。
+
+    恢复模式：保留 sop_plan_steps 进度标记。
+    全新模式：从 Markdown 文件加载并初始化。
+
+    Returns:
+        state → 加载成功
+        None → 加载失败，调用方应将错误对话框 state 返回给调用者
+    """
+    saved_sop_id = state["matched_sop_id"]
+
+    if is_resume:
         resume_state_fields(state, saved_action, saved_long_term)
         console.print(Panel(
             f"从中断点恢复执行: [bold]{saved_sop_id}[/bold]\n"
             f"行动: {saved_action}",
             title="恢复", title_align="left", padding=(0, 1),
         ))
-    else:
-        try:
-            state = load_sop_and_init_state(
-                state, resources.sop_dir, valid_tool_ids,
-                saved_sop_id, saved_action, saved_long_term,
-            )
-        except ValueError as e:
-            console.print(f"[bold red]SOP 加载失败: {e}[/bold red]")
-            tts_say(f"SOP 加载失败: {e}")
-            state["current_dialogue"].append({"role": "error", "content": f"SOP load failed: {e}"})
-            return state
+        return state
 
-    # ── 3. 执行 SOP 图 + TaskCompactor（单一计时器） ──
+    try:
+        return load_sop_and_init_state(
+            state, resources.sop_dir, valid_tool_ids,
+            saved_sop_id, saved_action, saved_long_term,
+        )
+    except ValueError as e:
+        console.print(f"[bold red]SOP 加载失败: {e}[/bold red]")
+        tts_say(f"SOP 加载失败: {e}")
+        state["current_dialogue"].append(
+            {"role": "error", "content": f"SOP load failed: {e}"}
+        )
+        return None
+
+
+# ── Phase 3: 执行 SOP 图 + TaskCompactor ───────────────────────────
+
+async def _execute_sop_with_timer(
+    state: dict,
+    app_graph,
+    task_compactor_fn,
+    console: Console,
+    app,
+    top_status_data: dict,
+    set_status_fn,
+) -> tuple:
+    """在一个共享计时器下运行 SOP 图 + TaskCompactor。
+
+    计时器驱动顶部状态栏的 spinner / dots / 颜色动画。
+
+    Returns:
+        (state, node_timings, final_task_status, total_rounds, sop_start, sop_elapsed)
+        其中 node_timings 为 None 表示图执行崩溃（state 已带 error 信息）。
+    """
     set_status_fn(f"执行中: {state['matched_sop_id']}")
     console.print(Panel(
         f"开始执行 SOP: [bold]{state['matched_sop_id']}[/bold]\n"
@@ -115,7 +141,7 @@ async def execute_sop_flow(
     sop_stop = asyncio.Event()
 
     async def _sop_timer():
-        """后台定时器：每 0.1s 刷新顶部状态栏动画（spinner + dots + 颜色 + 计时）。"""
+        """后台定时器：每 0.1s 刷新顶部状态栏动画。"""
         try:
             while not sop_stop.is_set():
                 elapsed = time.time() - sop_start
@@ -139,7 +165,6 @@ async def execute_sop_flow(
             )
         )
         await asyncio.sleep(0.3)
-
     except Exception as e:
         sop_stop.set()
         await sop_timer_task
@@ -150,8 +175,10 @@ async def execute_sop_flow(
         tts_say(f"SOP 执行崩溃: {e}")
         import traceback
         traceback.print_exc()
-        state["current_dialogue"].append({"role": "error", "content": f"SOP execution failed: {e}"})
-        return state
+        state["current_dialogue"].append(
+            {"role": "error", "content": f"SOP execution failed: {e}"}
+        )
+        return state, None, "", 0, sop_start, 0.0
 
     sop_elapsed = time.time() - sop_start
     console.print(Panel(
@@ -163,7 +190,7 @@ async def execute_sop_flow(
     set_status_fn(f"完成: {state['matched_sop_id']}")
     tts_say(f"SOP执行完毕。状态: {final_task_status}，耗时 {sop_elapsed:.0f} 秒，共 {total_rounds} 轮。")
 
-    # ── 3b. TaskCompactor（不单独计时，复用 SOP 计时器）──
+    # ── 3b. TaskCompactor（复用 SOP 计时器）──
     console.print("[dim][TaskCompactor] 评价与总结中...[/dim]")
     compactor_result = await loop.run_in_executor(
         None, task_compactor_fn, state
@@ -187,25 +214,102 @@ async def execute_sop_flow(
     ))
     tts_say(state["compactor_evaluation"])
 
-    # ── 5. 满意度确认 + 状态清理 ──
+    return state, node_timings, final_task_status, total_rounds, sop_start, sop_elapsed
+
+
+# ── Phase 4: 满意度确认 ──────────────────────────────────────────
+
+async def _finalize_execution(
+    state: dict,
+    console: Console,
+    set_status_fn,
+    wait_confirm_fn,
+    final_task_status: str,
+) -> tuple[dict, str]:
+    """满意度确认 + 执行状态清理。
+
+    Returns:
+        (state, user_query): user_query 供 write_sop_run_summary 使用
+    """
     set_status_fn("满意吗? (y/n)")
     satisfied = await wait_confirm_fn()
 
-    # 保存写 RUN_SUMMARY 所需字段（reset_sop_state 会清除它们）
     _run_user_query = state.get("current_action", "")
 
     if satisfied.lower() == 'y':
         record_compactor_summaries(state, is_satisfied=True)
         console.print("[dim]总结已记录。可以继续下一个任务了。[/dim]")
         tts_say("总结已记录。可以继续下一个任务了。")
-        # FINISH 后清除执行状态，避免干扰后续执行；INTERRUPT 保留状态等待恢复
         if final_task_status == "FINISH":
             state = reset_sop_state(state)
     else:
         console.print("[dim]总结未记录。请告诉我如何调整？[/dim]")
-        # 用户拒绝（n）→ 清除全部执行状态，避免残留 INTERRUPT 干扰后续执行
         state = reset_sop_state(state)
 
+    return state, _run_user_query
+
+
+# ── 主入口（精简编排层）──────────────────────────────────────────
+
+async def execute_sop_flow(
+    state: dict,
+    resources,
+    app_graph,
+    valid_tool_ids: set,
+    task_compactor_fn,
+    session_dir: str,
+    top_status_data: dict,
+    status_data: dict,
+    app,
+    console: Console,
+    set_status_fn,
+    wait_confirm_fn,
+) -> dict:
+    """SOP 执行主流程：确认 → 加载 → 执行+Compactor → 满意度 → 摘要。
+
+    Args:
+        set_status_fn: 更新底部状态栏的回调，签名 (text: str) -> None
+        wait_confirm_fn: 等待用户输入的回调，签名 () -> str
+    """
+    # ── 0. INTERRUPT 恢复检测 ──
+    is_resume = detect_interrupt_resume(state)
+
+    saved_sop_id = state["matched_sop_id"]
+    saved_action = state["current_action"]
+    saved_long_term = state["long_term_intent"]
+
+    # ── 1. 确认 ──
+    feedback = await _confirm_execution(
+        state, is_resume, console, set_status_fn, wait_confirm_fn
+    )
+    if feedback is not None:
+        return feedback
+
+    # ── 2. 加载 SOP ──
+    loaded = _load_sop_for_execution(
+        state, resources, valid_tool_ids, is_resume,
+        saved_action, saved_long_term, console,
+    )
+    if loaded is None:
+        return state
+    state = loaded
+
+    # ── 3. 执行 SOP 图 + TaskCompactor ──
+    state, node_timings, final_task_status, total_rounds, sop_start, sop_elapsed = (
+        await _execute_sop_with_timer(
+            state, app_graph, task_compactor_fn,
+            console, app, top_status_data, set_status_fn,
+        )
+    )
+    if node_timings is None:
+        return state  # 图执行崩溃，错误信息已在 state 中
+
+    # ── 4. 满意度 ──
+    state, _run_user_query = await _finalize_execution(
+        state, console, set_status_fn, wait_confirm_fn, final_task_status
+    )
+
+    # ── 5. 写 RUN_SUMMARY ──
     write_sop_run_summary(
         session_dir=session_dir,
         user_query=_run_user_query,
