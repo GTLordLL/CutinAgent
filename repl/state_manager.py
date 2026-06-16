@@ -47,6 +47,13 @@ def create_initial_state(user_query: str, session_dir: str,
         "thinker_input_tokens": 0,
         "chat_compact_requirement": "",
         "chat_conversation_summary": "",
+
+        # Problem Analyzer (v0.2)
+        "analyzer_current_state": "",
+        "analyzer_confidence": "",
+        "analyzer_tool_call": "",
+        "analyzer_my_understanding": "",
+        "analyzer_rounds_used": 0,
     }
 
 

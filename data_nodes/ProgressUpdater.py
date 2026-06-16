@@ -15,7 +15,7 @@ from parsers.sop_plan import _classify_step, StepType, _parse_steps, _reconstruc
 
 def _is_step_marked(step: dict) -> bool:
     """检查步骤是否已有任何状态标记（含 header 和 sub_lines）。"""
-    markers = ("结果:", "已跳过", "重试 ", "已达到重试上限")
+    markers = ("结果:", "已跳过", "重试 ", "已达到重试上限", "中断已完成")
     text = step['header']
     for sub in step['sub_lines']:
         text += ' ' + sub.strip()
@@ -103,6 +103,13 @@ def _update_conditional(step: dict, tool_call_raw: str,
         )
     else:
         step['header'] = f"{base} 结果: {formatted}。"
+    step['sub_lines'] = []
+
+
+def _update_interrupt(step: dict):
+    """INTERRUPT 步骤：写入中断已完成标记。"""
+    base = re.sub(r'\s*已跳过.*$', '', step['header'])
+    step['header'] = f"{base} 中断已完成，请继续执行。"
     step['sub_lines'] = []
 
 
@@ -234,7 +241,9 @@ def progress_updater_node(state: dict) -> dict:
     elif step_type == StepType.CONDITIONAL:
         _update_conditional(target, tool_call_raw,
                             status, conclusion, summary, detail_var)
-    # FINISH / INTERRUPT / ERROR: 不处理
+    elif step_type == StepType.INTERRUPT:
+        _update_interrupt(target)
+    # FINISH / ERROR: 不处理
 
     updated_plan = _reconstruct_plan(steps)
     elapsed = time.time() - t_start

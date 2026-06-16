@@ -130,10 +130,16 @@ def create_status_bar(default_text: str = "CutinAgent REPL — /help 查看命�
         (status_control, status_data): status_data 是可变字典，
         修改 status_data["text"] 后调用 app.invalidate() 即可刷新显示。
     """
-    status_data = {"text": f"  {default_text}  ", "token_info": ""}
+    status_data = {"text": f"  {default_text}  ", "token_info": "", "analysis_mode": False}
 
     def _get_status():
         line2 = status_data.get("token_info", "")
+        if status_data.get("analysis_mode", False):
+            # 替换整行，不追加原文
+            result = [("fg:ansimagenta bold", "  ANALYSIS ON"), ("fg:ansigray", " (shift+tab to cycle)")]
+            if line2:
+                result.append(("fg:ansigray", f"\n{line2}"))
+            return result
         if line2:
             return [("fg:ansigray", f"{status_data['text']}\n{line2}")]
         return [("fg:ansigray", status_data["text"])]
@@ -177,7 +183,7 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
                 any_picker = f if any_picker is None else any_picker | f
 
         bottom_elements = [
-            Window(height=1, char="─"),
+            Window(height=1, char="─", style="dim"),
             ConditionalContainer(
                 content=Window(content=bottom_status_control, height=2, style="class:status"),
                 filter=~any_picker,
@@ -216,7 +222,7 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
             )
     else:
         bottom_elements = [
-            Window(height=1, char="─"),
+            Window(height=1, char="─", style="dim"),
             Window(content=bottom_status_control, height=2, style="class:status"),
         ]
 
@@ -229,7 +235,7 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
             content=Window(height=1, char=" "),
             filter=~has_runtime,
         ),
-        Window(height=1, char="─"),
+        Window(height=1, char="─", style="dim"),
         input_field,
         *bottom_elements,
     ])

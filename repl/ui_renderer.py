@@ -9,12 +9,13 @@ from rich.markdown import Markdown
 from rich.text import Text
 from rich import box
 
+from repl import __version__
+
 
 def print_welcome(console: Console):
     import os
     cwd = os.getcwd()
 
-    sep = "=" * 65
 
     banner = (
         "     ______         __   _          ___                      __  \n"
@@ -23,19 +24,17 @@ def print_welcome(console: Console):
         "  / /___/ /_/ / / /_  / / / / /  / ___ / /_/ /  __/ / / / / /    \n"
         "  \\____/\\__,_/  |___//_/_/ /_/  /_/  |_\\__, /\\___/_/ /_/ /_/     \n"
         "                                      /____/                     \n"
-        "  https://github.com/GTLordLL/CutinAgent  --  千务小切 v0.1.0\n"
+        f"  https://github.com/GTLordLL/CutinAgent  --  千务小切 {__version__}\n"
     )
 
-    print(sep)
-    print(banner) # 记得保持使用原始print打印banner，因为rich打印banner的颜色会显示错误
+    print(f"\033[36m{banner}\033[0m")  # 青色 ANSI，保持原始 print 避免 Rich 颜色错位
 
     console.print(Text.assemble(
-        ("  当前目录：", "dim"),
+        ("  当前工作目录：", "dim"),
         (f"{cwd}\n", "white"),
         ("  /help 查看命令  /exit 退出", "dim italic"),
     ))
 
-    print(sep)
 
 
 def print_user_message(console: Console, text: str):

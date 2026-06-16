@@ -1,3 +1,5 @@
+__version__ = "v0.2.0"
+
 from repl.command_handler import dispatch_repl_command, ReplCompleter, REPL_COMMANDS, CmdSignal
 from repl.dialogue_utils import dialogue_to_text, parse_dialogue_text
 from repl.state_manager import create_initial_state, reset_sop_state
@@ -87,6 +89,7 @@ from repl.command_hint import (
 )
 
 __all__ = [
+    "__version__",
     "dispatch_repl_command",
     "ReplCompleter",
     "REPL_COMMANDS",

@@ -98,11 +98,22 @@ def tool_executor_node(state: dict) -> dict:
             "tool_summary": " | ".join(all_summary),
             "tool_detail_var": " | ".join(v for v in all_detail_var if v),
         }
-    else:
-        tool_call = state.get("current_tool_call", "")
-        tool_args = state.get("current_tool_args", {})
-        dt_start = time.time()
-        raw = dispatcher.dispatch(tool_call, tool_args)
-        dt_ms = (time.time() - dt_start) * 1000
-        return _process_tool_result(raw, session_dir, round_num, tool_call,
-                                    elapsed_ms=dt_ms)
+
+    tool_call = state.get("current_tool_call", "")
+    tool_args = state.get("current_tool_args", {})
+
+    # 空工具调用（如 INTERRUPT 恢复时 TOOL_CALL 为 None）：透传 no-op 结果
+    if not tool_call or tool_call == "None":
+        return {
+            "execution_result": "用户已确认继续。",
+            "tool_status": "成功",
+            "tool_conclusion": "中断已确认，继续执行后续步骤。",
+            "tool_summary": "",
+            "tool_detail_var": "",
+        }
+
+    dt_start = time.time()
+    raw = dispatcher.dispatch(tool_call, tool_args)
+    dt_ms = (time.time() - dt_start) * 1000
+    return _process_tool_result(raw, session_dir, round_num, tool_call,
+                                elapsed_ms=dt_ms)

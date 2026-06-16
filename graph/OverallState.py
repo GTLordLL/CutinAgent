@@ -42,6 +42,13 @@ class OverallState(TypedDict):
     # === 最终输出 ===
     final_report: str
 
+    # === Problem Analyzer 输出 (v0.2) ===
+    analyzer_current_state: str       # CURRENT_STATE — 已知事实 + 可选未知缺口
+    analyzer_confidence: str          # CONFIDENCE — high / medium / low
+    analyzer_tool_call: str           # TOOL_CALL — 工具调用字符串或 None
+    analyzer_my_understanding: str    # MY_UNDERSTANDING — high时输出意图推断，否则None
+    analyzer_rounds_used: int         # 实际使用的工具调用轮数
+
     # === REPL 循环状态 (UserCoordinator + Compactor) ===
     conversation_history: str       # Compactor 压缩追加的对话历史
     execution_history: str          # Compactor 压缩追加的执行历史
