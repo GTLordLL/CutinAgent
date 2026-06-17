@@ -8,6 +8,7 @@ UserCoordinator / ChatCompactor 的三处重复（~51行）。
 
 import asyncio
 import time
+from utils.cancel_token import is_cancelled
 
 
 def fmt_elapsed(seconds: float) -> str:
@@ -85,6 +86,7 @@ async def run_llm_node(label: str, node_fn, state: dict,
         app.invalidate()
 
     elapsed = time.time() - t_start
-    console.print(f"[dim]{label} 耗时: {fmt_elapsed(elapsed)}[/dim]")
+    if not is_cancelled():
+        console.print(f"[dim]{label} 耗时: {fmt_elapsed(elapsed)}[/dim]")
 
     return result, elapsed

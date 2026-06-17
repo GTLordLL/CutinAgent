@@ -10,6 +10,7 @@ import time
 from typing import Callable
 from langchain_core.messages import HumanMessage
 from rich.console import Console
+from utils.cancel_token import check_cancel
 
 
 def stream_llm(llm, prompt_text: str, label: str = "",
@@ -60,6 +61,8 @@ def stream_llm(llm, prompt_text: str, label: str = "",
 
         if token:
             full_text += token
+
+        check_cancel()
 
         if not usage and hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
             raw = dict(chunk.usage_metadata)

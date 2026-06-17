@@ -6,6 +6,7 @@
 
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import has_focus
+from utils.cancel_token import request_cancel
 from repl.pickers.session_picker import (
     picker_select, picker_cancel,
     picker_move_up, picker_move_down,
@@ -228,16 +229,26 @@ def create_keybindings(
     def _on_escape_enter(event):
         input_field.buffer.insert_text("\n")
 
-    # ── Ctrl-C：退出 Application ──
+    # ── Ctrl-C：处理中取消任务，空闲时退出 Application ──
     @kb.add("c-c")
     def _on_ctrl_c(event):
-        event.app.exit(result="exit")
+        if flags.get("processing"):
+            request_cancel()
+            if flags.get("waiting_confirm"):
+                confirm_event.set()
+        else:
+            event.app.exit(result="exit")
 
-    # ── Esc：清空输入区 ──
+    # ── Esc：处理中取消任务，空闲时清空输入区 ──
     @kb.add("escape", filter=has_focus(input_field))
     def _on_escape(event):
-        input_field.buffer.text = ""
-        input_field._hist_index = None
+        if flags.get("processing"):
+            request_cancel()
+            if flags.get("waiting_confirm"):
+                confirm_event.set()
+        else:
+            input_field.buffer.text = ""
+            input_field._hist_index = None
 
     # ── Up/Down：历史输入导航（仅在无 picker 时生效）──
     _hist_filter = has_focus(input_field)

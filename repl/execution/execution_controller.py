@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from utils.tts_engine import tts_say
+from utils.cancel_token import CancellationError, check_cancel
 from data_nodes.VariableStore import clear as clear_variables, get_all as get_all_variables
 from repl.state.state_manager import reset_sop_state
 from repl.execution.sop_runner import run_sop_graph, _iterate_graph_stream
@@ -165,6 +166,13 @@ async def _execute_sop_with_timer(
             )
         )
         await asyncio.sleep(0.3)
+    except CancellationError:
+        sop_stop.set()
+        await sop_timer_task
+        top_status_data["label"] = ""
+        top_status_data["elapsed"] = 0
+        app.invalidate()
+        raise
     except Exception as e:
         sop_stop.set()
         await sop_timer_task
@@ -189,6 +197,8 @@ async def _execute_sop_with_timer(
     ))
     set_status_fn(f"完成: {state['matched_sop_id']}")
     tts_say(f"SOP执行完毕。状态: {final_task_status}，耗时 {sop_elapsed:.0f} 秒，共 {total_rounds} 轮。")
+
+    check_cancel()
 
     # ── 3b. TaskCompactor（复用 SOP 计时器）──
     console.print("[dim][TaskCompactor] 评价与总结中...[/dim]")

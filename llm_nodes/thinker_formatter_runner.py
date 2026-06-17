@@ -31,6 +31,7 @@ import time
 from rich.console import Console
 from utils.debug_logger import log_node_io
 from utils.streaming import stream_llm
+from utils.cancel_token import check_cancel
 from repl.config_manager import get_config
 
 
@@ -96,6 +97,8 @@ def _run_formatter_with_retry(formatter_llm, formatter_prompt: str,
         )
         if fmt_tokens:
             formatter_tokens_list.append(fmt_tokens)
+
+        check_cancel()
 
         is_valid, error_reason, p = validate_output(raw_output, **ctx)
         formatter_logs.append({
@@ -189,6 +192,8 @@ def run_thinker_formatter(
         thinker_llm, thinker_prompt, thinker_input,
         buf_interval, console, silent, thinker_label,
     )
+
+    check_cancel()
 
     # ── Formatter 重试循环 ──
     parsed, formatter_logs, formatter_tokens_list = _run_formatter_with_retry(

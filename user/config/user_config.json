@@ -6,5 +6,5 @@
     "analyzer_max_rounds": 3,
     "tts_enabled": true,
     "tts_voice": "zh-CN-XiaoxiaoNeural",
-    "tts_rate": "+10%"
+    "tts_rate": "+20%"
 }

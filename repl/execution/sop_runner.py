@@ -4,6 +4,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 from utils.debug_logger import log_state_snapshot
+from utils.cancel_token import check_cancel
 from utils.tts_engine import tts_say
 
 # 报告类工具的 conclusion 值 —— 匹配时立即 TTS 播报
@@ -108,6 +109,8 @@ def _iterate_graph_stream(app, state: dict, node_callback=None):
                 # 累积 state
                 state.update(output)
                 node_start = time.time()
+
+            check_cancel()
 
     return state, node_timings, final_task_status, total_rounds, node_outputs
 

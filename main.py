@@ -5,6 +5,7 @@ from rich.console import Console
 
 from graph.Builder import build_graph
 from utils.LLMResources import initialize_resources
+from utils.cancel_token import reset_cancel
 from utils.tts_engine import speak_async, preload as preload_tts, is_loaded as tts_is_loaded
 from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
@@ -63,6 +64,9 @@ console = Console()
 
 async def run_repl():
     """REPL 主循环：Application(full_screen=False) 常驻输入区 + patch_stdout 分流输出。"""
+
+    # ── 0. 重置取消令牌 ────────────────────────────────────────
+    reset_cancel()
 
     # ── 1. 初始化资源 ──────────────────────────────────────────
     console.print("[dim]正在初始化 LLM 资源与知识库...[/dim]")

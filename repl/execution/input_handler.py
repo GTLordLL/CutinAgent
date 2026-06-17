@@ -20,6 +20,7 @@ import traceback
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from repl.repl_context import REPLContext
+from utils.cancel_token import CancellationError, reset_cancel
 
 
 # ── 模块级辅助函数（原 run_repl 闭包）──────────────────────────
@@ -85,6 +86,9 @@ async def handle_user_input(ctx: REPLContext, user_msg: str) -> None:
             # --- 普通消息 -----------------------------------------
             await _handle_normal_message(ctx, user_msg)
 
+        except CancellationError:
+            ctx.console.print("\n[bold yellow]已停止当前执行。[/bold yellow]")
+            reset_cancel()
         except Exception:
             traceback.print_exc()
         finally:

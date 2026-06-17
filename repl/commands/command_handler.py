@@ -69,7 +69,6 @@ def dispatch_repl_command(cmd: str, state: dict, resources) -> tuple:
     if name == "/analyse":
         return True, CmdSignal.ANALYSE_TOGGLE, False
 
-
     return False, None, False
 
 
