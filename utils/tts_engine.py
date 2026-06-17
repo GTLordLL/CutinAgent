@@ -125,8 +125,12 @@ def _clean_markdown(text: str) -> str:
     # 17. 表格竖线: 替换为空格
     text = re.sub(r'\|', ' ', text)
 
-    # ── 第7层：空白清理 ──
-    # 18. 清理多余空白
+    # ── 第7层：标识符 & 空白清理 ──
+    # 18. 下划线标识符 → 空格：GIT_SMART_COMMIT → GIT SMART COMMIT
+    #     放在 Markdown 清洗之后，此时 __bold__ / ___ 等已处理完毕，
+    #     剩余的 _ 都是标识符分隔符，替换为空格避免 TTS 读成"下划线"
+    text = text.replace('_', ' ')
+    # 19. 清理多余空白
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r' {2,}', ' ', text)
 
