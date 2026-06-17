@@ -1,6 +1,6 @@
 {
     "auto_compact_threshold": 4096,
-    "stream_buffer_interval": 2,
+    "stream_buffer_interval": 3,
     "input_max_lines": 10,
     "analyzer_enabled": false,
     "analyzer_max_rounds": 3,

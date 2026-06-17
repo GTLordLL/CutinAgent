@@ -23,7 +23,7 @@ _DEFAULTS = {
 RUNTIME_CONFIG = dict(_DEFAULTS)
 
 # ── 持久化路径（基于 config_manager.py 位置解析项目根目录）──
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _USER_CONFIG_PATH = os.path.join(_PROJECT_ROOT, "user", "config", "user_config.json")
 
 
