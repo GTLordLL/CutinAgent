@@ -1,4 +1,4 @@
-"""批量测试 4 个 Git SOP：GIT_BRANCH_CLEANUP, GIT_REPO_HEALTH, GIT_RELEASE_NOTES, GIT_CONFLICT_RESOLVE。
+"""批量测试操作类 Git SOP：GIT_SMART_COMMIT, GIT_BRANCH_CLEANUP。
 
 在 tests/demo_environments/ 预搭建的 tmp 仓库中运行完整 SOP 流程。
 每个 SOP 先加载 markdown 填充 state，再执行图，最后 TaskCompactor。
@@ -35,21 +35,13 @@ PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
 
 DEMOS = {
+    "GIT_SMART_COMMIT": {
+        "dir": os.path.join(TMP_DIR, "demo_smart_commit"),
+        "instruction": "帮我提交当前的变更",
+    },
     "GIT_BRANCH_CLEANUP": {
         "dir": os.path.join(TMP_DIR, "demo_branch_cleanup"),
         "instruction": "帮我清理过期的已合并分支",
-    },
-    "GIT_REPO_HEALTH": {
-        "dir": os.path.join(TMP_DIR, "demo_repo_health"),
-        "instruction": "全面检查仓库健康状态",
-    },
-    "GIT_RELEASE_NOTES": {
-        "dir": os.path.join(TMP_DIR, "demo_release_notes"),
-        "instruction": "生成从v0.1.0到v0.2.0的 Release Notes",
-    },
-    "GIT_CONFLICT_RESOLVE": {
-        "dir": os.path.join(TMP_DIR, "demo_conflict_resolve"),
-        "instruction": "帮我分析并解决当前的合并冲突",
     },
 }
 
@@ -185,7 +177,7 @@ def run_sop_test(sop_id: str, resources, app_graph, original_cwd: str) -> dict:
 
 def main():
     print("=" * 60)
-    print("  批量测试 4 个 Git SOP")
+    print("  批量测试操作类 Git SOP")
     print("=" * 60)
 
     original_cwd = os.getcwd()
@@ -203,15 +195,11 @@ def main():
 
     # 1. 重建所有演示环境
     print(f"\n{C_BOLD}[1] 重建演示环境...{C_RESET}")
+    from tests.demo_environments.demo_smart_commit import setup_demo_smart_commit
     from tests.demo_environments.demo_branch_cleanup import setup_demo_branch_cleanup
-    from tests.demo_environments.demo_repo_health import setup_demo_repo_health
-    from tests.demo_environments.demo_release_notes import setup_demo_release_notes
-    from tests.demo_environments.demo_conflict_resolve import setup_demo_conflict_resolve
 
+    setup_demo_smart_commit(os.path.join(TMP_DIR, "demo_smart_commit"))
     setup_demo_branch_cleanup(os.path.join(TMP_DIR, "demo_branch_cleanup"))
-    setup_demo_repo_health(os.path.join(TMP_DIR, "demo_repo_health"))
-    setup_demo_release_notes(os.path.join(TMP_DIR, "demo_release_notes"))
-    setup_demo_conflict_resolve(os.path.join(TMP_DIR, "demo_conflict_resolve"))
 
     # 2. 依次测试
     results = {}

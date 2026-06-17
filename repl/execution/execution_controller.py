@@ -158,73 +158,68 @@ async def _execute_sop_with_timer(
 
     sop_timer_task = asyncio.create_task(_sop_timer())
 
-    # ── 3a. 运行 SOP 图 ──
     try:
-        state, node_timings, final_task_status, total_rounds, node_outputs = (
-            await loop.run_in_executor(
-                None, run_sop_graph, app_graph, state, console
+        # ── 3a. 运行 SOP 图 ──
+        try:
+            state, node_timings, final_task_status, total_rounds, node_outputs = (
+                await loop.run_in_executor(
+                    None, run_sop_graph, app_graph, state, console
+                )
             )
+            await asyncio.sleep(0.3)
+        except CancellationError:
+            raise  # 让 finally 清理定时器
+        except Exception as e:
+            console.print(f"[bold red]SOP 执行崩溃: {e}[/bold red]")
+            tts_say(f"SOP 执行崩溃: {e}")
+            import traceback
+            traceback.print_exc()
+            state["current_dialogue"].append(
+                {"role": "error", "content": f"SOP execution failed: {e}"}
+            )
+            return state, None, "", 0, sop_start, 0.0
+
+        # 尽早检查取消（在打印成功消息前），防止 LangGraph 内部吞掉
+        # CancellationError 后仍打印 "SOP 执行完毕"
+        check_cancel()
+
+        sop_elapsed = time.time() - sop_start
+        console.print(Panel(
+            f"状态: {final_task_status}  |  "
+            f"耗时: {sop_elapsed:.2f}s  |  "
+            f"轮次: {total_rounds}",
+            title="SOP 执行完毕", title_align="left", padding=(0, 1),
+        ))
+        set_status_fn(f"完成: {state['matched_sop_id']}")
+        tts_say(f"SOP执行完毕。状态: {final_task_status}，耗时 {sop_elapsed:.0f} 秒，共 {total_rounds} 轮。")
+
+        # ── 3b. TaskCompactor（复用 SOP 计时器）──
+        console.print("[dim][TaskCompactor] 评价与总结中...[/dim]")
+        compactor_result = await loop.run_in_executor(
+            None, task_compactor_fn, state
         )
         await asyncio.sleep(0.3)
-    except CancellationError:
+        state.update(compactor_result)
+
+        total_elapsed = time.time() - sop_start
+        console.print(f"[dim]总耗时 (SOP + TaskCompactor): {fmt_elapsed(total_elapsed)}[/dim]")
+
+        console.print()
+        console.print(Panel(
+            state["compactor_evaluation"],
+            title="执行评价", title_align="left", padding=(0, 1),
+        ))
+        tts_say(state["compactor_evaluation"])
+
+        return state, node_timings, final_task_status, total_rounds, sop_start, sop_elapsed
+
+    finally:
+        # 无论成功/失败/取消，始终停止定时器并清理状态栏
         sop_stop.set()
         await sop_timer_task
         top_status_data["label"] = ""
         top_status_data["elapsed"] = 0
         app.invalidate()
-        raise
-    except Exception as e:
-        sop_stop.set()
-        await sop_timer_task
-        top_status_data["label"] = ""
-        top_status_data["elapsed"] = 0
-        app.invalidate()
-        console.print(f"[bold red]SOP 执行崩溃: {e}[/bold red]")
-        tts_say(f"SOP 执行崩溃: {e}")
-        import traceback
-        traceback.print_exc()
-        state["current_dialogue"].append(
-            {"role": "error", "content": f"SOP execution failed: {e}"}
-        )
-        return state, None, "", 0, sop_start, 0.0
-
-    sop_elapsed = time.time() - sop_start
-    console.print(Panel(
-        f"状态: {final_task_status}  |  "
-        f"耗时: {sop_elapsed:.2f}s  |  "
-        f"轮次: {total_rounds}",
-        title="SOP 执行完毕", title_align="left", padding=(0, 1),
-    ))
-    set_status_fn(f"完成: {state['matched_sop_id']}")
-    tts_say(f"SOP执行完毕。状态: {final_task_status}，耗时 {sop_elapsed:.0f} 秒，共 {total_rounds} 轮。")
-
-    check_cancel()
-
-    # ── 3b. TaskCompactor（复用 SOP 计时器）──
-    console.print("[dim][TaskCompactor] 评价与总结中...[/dim]")
-    compactor_result = await loop.run_in_executor(
-        None, task_compactor_fn, state
-    )
-    await asyncio.sleep(0.3)
-    state.update(compactor_result)
-
-    # 停止单一计时器
-    total_elapsed = time.time() - sop_start
-    sop_stop.set()
-    await sop_timer_task
-    top_status_data["label"] = ""
-    top_status_data["elapsed"] = 0
-    app.invalidate()
-    console.print(f"[dim]总耗时 (SOP + TaskCompactor): {fmt_elapsed(total_elapsed)}[/dim]")
-
-    console.print()
-    console.print(Panel(
-        state["compactor_evaluation"],
-        title="执行评价", title_align="left", padding=(0, 1),
-    ))
-    tts_say(state["compactor_evaluation"])
-
-    return state, node_timings, final_task_status, total_rounds, sop_start, sop_elapsed
 
 
 # ── Phase 4: 满意度确认 ──────────────────────────────────────────

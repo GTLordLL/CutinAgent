@@ -12,7 +12,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="""
 示例:
   cutin run --sop GIT_SMART_COMMIT "提交当前变更"
-  cutin run --sop GIT_DAILY_SUMMARY --output json "汇总今日提交"
+  cutin run --sop GIT_SMART_COMMIT --output json "提交当前变更"
   cutin run --output json "帮我看看Git状态"
   cutin run --stream "分析一下代码变更"
         """,

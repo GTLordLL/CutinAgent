@@ -12,11 +12,11 @@
 
 ### 当前痛点：SOP 是平的，无法表达长任务
 
-目前两个 SOP（`GIT_SMART_COMMIT`、`GIT_DAILY_SUMMARY`）各自独立，每个 SOP 的 Plan_Steps 是一组扁平的工具调用序列。这在简单场景下够用，但遇到以下需求就力不从心：
+目前三个操作类 SOP（`GIT_SMART_COMMIT`、`GIT_BRANCH_CLEANUP`、`GIT_PR_CREATE`）各自独立，每个 SOP 的 Plan_Steps 是一组扁平的工具调用序列。这在简单场景下够用，但遇到以下需求就力不从心：
 
-1. **组合任务**：用户说 "整理今天的工作，生成日报，然后提交" → 这实际上是 `GIT_DAILY_SUMMARY` + `GIT_SMART_COMMIT` 两个 SOP 的顺序组合。当前没有机制让一个 SOP 调用另一个 SOP，用户需要分两次交互完成。
+1. **组合任务**：用户说 "检查仓库健康状态，然后提交" → 这需要信息收集 + `GIT_SMART_COMMIT` 两个 SOP 的顺序组合。当前没有机制让一个 SOP 调用另一个 SOP，用户需要分两次交互完成。
 2. **长任务链**：一个复杂的系统诊断可能包含 "收集系统指标 → 分析异常 → 如果异常则深度检查 → 生成修复建议 → 如果用户确认则执行修复"。每一步本身可能就是一个完整的 SOP。
-3. **复用**：多个 SOP 共享同一个子流程（如 "收集 Git 状态" 这个子流程，在 `GIT_SMART_COMMIT` 和 `GIT_DAILY_SUMMARY` 中都需要），当前只能复制粘贴步骤文本。
+3. **复用**：多个 SOP 共享同一个子流程（如 "收集 Git 状态" 这个子流程，在 `GIT_SMART_COMMIT` 和 `GIT_PR_CREATE` 中都需要），当前只能复制粘贴步骤文本。
 
 子 SOP 嵌套本质上是用**函数调用的思想**组织 SOP：每个 SOP 是一个可独立执行、可被其他 SOP 调用的"函数"。
 
@@ -25,8 +25,8 @@
 在 Plan_Steps 中新增第五种步骤类型 `CALL_SOP`（当前已有 SEQUENTIAL、CONDITIONAL、PARALLEL、FINISH）：
 
 ```
-5. 调用 GIT_DAILY_SUMMARY(time_range="today")
-6. 如果日报生成成功，就调用 GIT_SMART_COMMIT(message=VAR_daily_report)
+5. 调用 GIT_BRANCH_CLEANUP()
+6. 如果分支清理成功，就调用 GIT_SMART_COMMIT(message=VAR_cleanup_result)
 ```
 
 `CALL_SOP` 的解析优先级在 PARALLEL 之后、CONDITIONAL 之前（因为它可以出现在条件分支中）：
@@ -83,20 +83,20 @@ sop_call_stack: list[dict]   # SOP 调用栈
 ```
 父 SOP Plan_Steps:
   1. 调用 get_git_status()
-  2. 调用 get_git_log(since="today")
-  3. 调用 GIT_DAILY_SUMMARY(time_range="today")    ← CALL_SOP
-  4. FINISH 日报已生成。
+  2. 调用 get_git_branches()
+  3. 调用 GIT_BRANCH_CLEANUP()    ← CALL_SOP
+  4. FINISH 分支清理已完成。
 
 执行到步骤 3 时：
 
 1. Scheduler 检测到步骤 3 是 CALL_SOP 类型
 2. Push：将当前父 SOP 状态压入调用栈
-3. Load：加载子 SOP (GIT_DAILY_SUMMARY) 的 Plan_Steps
+3. Load：加载子 SOP (GIT_BRANCH_CLEANUP) 的 Plan_Steps
 4. Execute：子 SOP 在自己的上下文中完整执行（多轮 Scheduler → ToolExecutor → ProgressUpdater）
 5. Result：子 SOP 执行完毕（FINISH/ERROR）
 6. Pop：从调用栈弹出，恢复父 SOP 状态
-7. 将子 SOP 的执行结果写入 VAR_sub_GIT_DAILY_SUMMARY_result
-8. ProgressUpdater 在父 SOP 步骤 3 处追加 "子SOP已完成: 日报内容摘要..."
+7. 将子 SOP 的执行结果写入 VAR_sub_GIT_BRANCH_CLEANUP_result
+8. ProgressUpdater 在父 SOP 步骤 3 处追加 "子SOP已完成: 清理了3个过期分支..."
 9. Scheduler 继续执行父 SOP 步骤 4
 ```
 
@@ -175,7 +175,7 @@ def _update_call_sop(step: dict, sub_sop_id: str, status: str,
 
 父 SOP 的步骤 3 在子 SOP 执行完毕后变为：
 ```
-3. 调用 GIT_DAILY_SUMMARY(time_range="today") 子SOP[GIT_DAILY_SUMMARY] 结果: 成功 | 日报已生成，包含5个提交 | 变量: VAR_sub_GIT_DAILY_SUMMARY_result。
+3. 调用 GIT_BRANCH_CLEANUP() 子SOP[GIT_BRANCH_CLEANUP] 结果: 成功 | 已删除3个过期分支 | 变量: VAR_sub_GIT_BRANCH_CLEANUP_result。
 ```
 
 用户通过查看父 SOP 的进度，能看到子 SOP 的执行摘要——不需要展开子 SOP 的每一步。
@@ -188,9 +188,9 @@ def _update_call_sop(step: dict, sub_sop_id: str, status: str,
 全局 VariableStore:
   VAR_get_git_diff (父 SOP 步骤 1 产出)
   VAR_get_git_log (父 SOP 步骤 2 产出)
-  VAR_sub_GIT_DAILY_SUMMARY_result (子 SOP 返回结果)
+  VAR_sub_GIT_BRANCH_CLEANUP_result (子 SOP 返回结果)
   
-子 SOP GIT_DAILY_SUMMARY 内部：
+子 SOP GIT_BRANCH_CLEANUP 内部：
   可以读取父 SOP 的变量（通过 VAR_ 引用）
   子 SOP 内部变量不与父 SOP 冲突（如 VAR_get_git_log 在子 SOP 中也可以产出，但存入子 SOP 命名空间）
 ```
@@ -254,8 +254,8 @@ def detect_circular_reference(sop_id: str, all_sops: dict,
 当父 SOP 调用子 SOP 时，子 SOP 的 `user_instruction` 被自动生成为参数化描述：
 
 ```
-父 SOP 步骤 3: 调用 GIT_DAILY_SUMMARY(time_range="today")
-→ 子 SOP user_instruction: "执行 GIT_DAILY_SUMMARY，参数: time_range=today"
+父 SOP 步骤 3: 调用 GIT_BRANCH_CLEANUP()
+→ 子 SOP user_instruction: "执行 GIT_BRANCH_CLEANUP"
 ```
 
 这个自动生成的 instruction 出现在子 SOP 的 Scheduler Thinker 输入中，让子 SOP 知道自己被调用的上下文。
@@ -305,7 +305,7 @@ SOP 嵌套模仿了完全相同的抽象：一个 SOP 就是一个函数，`CALL
 
 ### 组合优于复制
 
-没有子 SOP，如果 `GIT_SMART_COMMIT` 和 `GIT_DAILY_SUMMARY` 都需要 "收集 Git 状态" 这个步骤序列，只能复制粘贴到两个 SOP 的 Plan_Steps 中。问题：
+没有子 SOP，如果 `GIT_SMART_COMMIT` 和 `GIT_PR_CREATE` 都需要 "收集 Git 状态" 这个步骤序列，只能复制粘贴到两个 SOP 的 Plan_Steps 中。问题：
 - 修改时需同步更新两处（容易漏）
 - 步骤序列本身没有命名（不知道这段步骤 "是什么"）
 - 增加了每个 SOP 的步骤数量（更长 = 更难调试）
@@ -353,8 +353,8 @@ CALL_SOP 的引入不强制所有 SOP 使用嵌套。一个只有 4 个工具的
 ### 继续用多个独立 SOP 手动串联
 
 用户说 "整理今天的工作，生成日报，然后提交"：
-- 当前：用户说 → Agent 匹配 GIT_DAILY_SUMMARY → 执行 → 完成 → 用户再说 "帮我提交" → Agent 匹配 GIT_SMART_COMMIT → 执行
-- 嵌套 SOP 下：用户说一句话 → Agent 匹配顶层 SOP → 顶层 SOP 自动调用日报子 SOP → 日报结果驱逐提交子 SOP → 一气呵成
+- 当前：用户说 → Agent 匹配 GIT_BRANCH_CLEANUP → 执行 → 完成 → 用户再说 "帮我提交" → Agent 匹配 GIT_SMART_COMMIT → 执行
+- 嵌套 SOP 下：用户说一句话 → Agent 匹配顶层 SOP → 顶层 SOP 自动调用清理子 SOP → 清理完成后继续提交子 SOP → 一气呵成
 
 前者需要用户记住 "日报做完了，现在要提交"，后者是一次交互。对于长任务来说，中间的上下文切换（用户在日报完成和提交开始之间等待）是高频的痛点。
 
@@ -378,7 +378,7 @@ CALL_SOP 的引入不强制所有 SOP 使用嵌套。一个只有 4 个工具的
 
 SOP A 调用 SOP B，SOP B 调用 SOP A → 运行时进入无限嵌套循环 → 直到 `max_sop_depth` 被触发才终止 → 此时已经浪费了大量 LLM 调用和 token。
 
-更隐蔽的情况：A → B → C → A（三节点循环）。SOP 作者在编写时可能完全没意识到这个间接循环的存在（因为 A 和 C 是不同人编写的）。静态检测在加载时就报告 `检测到循环引用: GIT_DAILY_SUMMARY → GIT_SMART_COMMIT → GIT_DAILY_SUMMARY`——SOP 作者在看到这条报错时立刻明白了问题所在。
+更隐蔽的情况：A → B → C → A（三节点循环）。SOP 作者在编写时可能完全没意识到这个间接循环的存在（因为 A 和 C 是不同人编写的）。静态检测在加载时就报告 `检测到循环引用: GIT_BRANCH_CLEANUP → GIT_SMART_COMMIT → GIT_BRANCH_CLEANUP`——SOP 作者在看到这条报错时立刻明白了问题所在。
 
 ### 嵌套深度不做限制
 

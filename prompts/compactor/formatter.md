@@ -18,9 +18,9 @@ EXECUTION_SUMMARY: <compacted execution summary>
 ## Examples
 
 Example 1 (successful execution):
-EVALUATION: GIT_DAILY_SUMMARY executed successfully. All 5 of today's commits were categorized correctly into feat, fix, and docs types. The structured report meets the user's requirements.
-CONVERSATION_SUMMARY: User requested a daily git summary to track development progress. They plan to make this part of their daily wrap-up workflow, potentially integrating with report sharing in the future.
-EXECUTION_SUMMARY: GIT_DAILY_SUMMARY analyzed 5 commits from today: 2 feature commits (new tool implementations in git_ops), 2 bug fixes, and 1 documentation update. Report was generated with proper Conventional Commits categorization.
+EVALUATION: GIT_SMART_COMMIT executed successfully. All 3 changed files were staged and committed with a well-structured Conventional Commits message. The commit message accurately reflects the changes.
+CONVERSATION_SUMMARY: User requested an intelligent git commit for their working directory changes. They prefer conventional commit format and want the commit message to be generated automatically from the diff analysis.
+EXECUTION_SUMMARY: GIT_SMART_COMMIT analyzed 3 changed files (2 modified, 1 new), generated a "feat(tools): add new diagnostic helpers" commit message, staged all files, and committed successfully. The LLM correctly identified the primary change type as a feature addition.
 
 Example 2 (partial failure):
 EVALUATION: DISK_CLEANUP_SCAN completed but found no large files exceeding the default threshold. The user may need to adjust the threshold to find relevant cleanup candidates.
