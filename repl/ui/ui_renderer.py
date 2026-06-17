@@ -9,7 +9,7 @@ from rich.markdown import Markdown
 from rich.text import Text
 from rich import box
 
-from repl import __version__
+from repl.version import __version__
 
 
 def print_welcome(console: Console):

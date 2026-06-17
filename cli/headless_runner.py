@@ -12,10 +12,10 @@ from utils.sop_loader import load_sop_markdown
 from graph.Builder import build_graph
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
 from llm_nodes.TaskCompactorNode import task_compactor_node
-from repl.state_manager import create_initial_state
-from repl.session_manager import generate_session_id, create_session_dir, write_run_summary
-from repl.llm_runner import run_llm_node_sync
-from repl.execution_controller import execute_sop_flow_headless
+from repl.state.state_manager import create_initial_state
+from repl.state.session_manager import generate_session_id, create_session_dir, write_run_summary
+from repl.execution.llm_runner import run_llm_node_sync
+from repl.execution.execution_controller import execute_sop_flow_headless
 from cli.output_formatter import HeadlessRunResult, format_plain, format_json, format_json_full
 
 

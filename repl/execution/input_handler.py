@@ -35,7 +35,7 @@ def repl_set_status(ctx: REPLContext, text: str) -> None:
 
 def repl_sync_analysis_indicator(ctx: REPLContext) -> None:
     """同步分析模式指示器到状态栏。"""
-    from repl.config_manager import get_config
+    from repl.state.config_manager import get_config
     cfg = get_config()
     ctx.status_data["analysis_mode"] = cfg.get("analyzer_enabled", False)
     if ctx.app is not None:
@@ -69,7 +69,7 @@ async def handle_user_input(ctx: REPLContext, user_msg: str) -> None:
             if (len(analyse_parts) > 1
                     and analyse_parts[0].lower() == "/analyse"
                     and analyse_parts[1].strip()):
-                from repl.config_manager import get_config, apply_config
+                from repl.state.config_manager import get_config, apply_config
                 cfg = get_config()
                 if not cfg.get("analyzer_enabled", False):
                     apply_config({"analyzer_enabled": True})
@@ -96,7 +96,7 @@ async def handle_user_input(ctx: REPLContext, user_msg: str) -> None:
 
 async def _handle_config_picker_command(ctx: REPLContext) -> None:
     """激活配置选择器，等待用户操作，显示结果。"""
-    from repl.config_picker import activate_config_picker, deactivate_config_picker
+    from repl.pickers.config_picker import activate_config_picker, deactivate_config_picker
     from repl import print_command_result
 
     activate_config_picker(ctx.config_picker_state)
@@ -139,7 +139,7 @@ async def _handle_command(ctx: REPLContext, user_msg: str) -> tuple[bool, str]:
         handle_load_session,
         handle_show_sop_picker,
     )
-    from repl.config_manager import get_config, apply_config
+    from repl.state.config_manager import get_config, apply_config
 
     # /clear → 新会话
     if msg == CmdSignal.NEW_SESSION:
@@ -186,7 +186,7 @@ async def _handle_command(ctx: REPLContext, user_msg: str) -> tuple[bool, str]:
 
     # /compact → 手动压缩
     if user_msg.strip().lower().startswith("/compact"):
-        from repl.compaction_controller import run_chat_compactor
+        from repl.execution.compaction_controller import run_chat_compactor
         await run_chat_compactor(
             ctx.chat_compactor_fn, ctx.state, ctx.top_status_data,
             ctx.app, ctx.console, triggered_by="manual"
@@ -203,9 +203,9 @@ async def _handle_normal_message(ctx: REPLContext, user_msg: str) -> None:
     from repl import (
         print_user_message, print_agent_message,
     )
-    from repl.session_manager import generate_session_id
-    from repl.compaction_controller import try_auto_compact
-    from repl.llm_runner import run_llm_node
+    from repl.state.session_manager import generate_session_id
+    from repl.execution.compaction_controller import try_auto_compact
+    from repl.execution.llm_runner import run_llm_node
     from utils.tts_engine import tts_say
 
     # 追加到当前对话
@@ -297,8 +297,8 @@ async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
     最多运行 analyzer_max_rounds 轮，高置信度时提前退出。
     分析结果追加到 current_dialogue 供 UserCoordinator 参考。
     """
-    from repl.config_manager import get_config
-    from repl.llm_runner import run_llm_node
+    from repl.state.config_manager import get_config
+    from repl.execution.llm_runner import run_llm_node
 
     cfg = get_config()
     if not cfg.get("analyzer_enabled", False):
@@ -353,8 +353,8 @@ async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
 async def _run_coordinator_and_execute(ctx: REPLContext) -> None:
     """运行 UserCoordinator → TTS 播报 → IS_EXECUTE 判断 → SOP 执行。"""
     from repl import print_agent_message
-    from repl.llm_runner import run_llm_node
-    from repl.execution_controller import execute_sop_flow
+    from repl.execution.llm_runner import run_llm_node
+    from repl.execution.execution_controller import execute_sop_flow
     from utils.tts_engine import tts_say
 
     repl_set_status(ctx, "分析中...")

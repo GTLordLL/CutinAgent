@@ -17,10 +17,10 @@ from utils.LLMResources import initialize_resources
 from utils.sop_loader import load_sop_markdown
 from utils.debug_logger import set_session_dir
 from data_nodes.VariableStore import clear as clear_variables
-from repl.sop_runner import _iterate_graph_stream
-from repl.llm_runner import run_llm_node_sync
+from repl.execution.sop_runner import _iterate_graph_stream
+from repl.execution.llm_runner import run_llm_node_sync
 from llm_nodes.TaskCompactorNode import task_compactor_node
-from repl.state_manager import reset_sop_state
+from repl.state.state_manager import reset_sop_state
 
 # 颜色
 C_BOLD = "\033[1m"

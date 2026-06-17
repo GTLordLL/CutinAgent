@@ -30,7 +30,7 @@ def chat_compactor_node(resources):
 
         from validator.ChatCompactorValidator import validate_chat_compactor_output
 
-        def map_result(parsed, thinker_tokens):
+        def map_result(parsed, thinker_tokens, **ctx):
             return {
                 "chat_conversation_summary": parsed.get("conversation_summary", ""),
             }

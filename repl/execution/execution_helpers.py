@@ -8,8 +8,8 @@ from datetime import datetime
 
 from utils.sop_loader import load_sop_markdown
 from data_nodes.VariableStore import clear as clear_variables
-from repl.state_manager import reset_sop_state
-from repl.session_manager import write_run_summary
+from repl.state.state_manager import reset_sop_state
+from repl.state.session_manager import write_run_summary
 
 
 def detect_interrupt_resume(state: dict) -> bool:

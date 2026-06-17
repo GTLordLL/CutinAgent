@@ -1,9 +1,9 @@
-__version__ = "v0.2.0"
+from repl.version import __version__
 
-from repl.command_handler import dispatch_repl_command, ReplCompleter, REPL_COMMANDS, CmdSignal
-from repl.dialogue_utils import dialogue_to_text, parse_dialogue_text
-from repl.state_manager import create_initial_state, reset_sop_state
-from repl.session_manager import (
+from repl.commands.command_handler import dispatch_repl_command, ReplCompleter, REPL_COMMANDS, CmdSignal
+from repl.commands.dialogue_utils import dialogue_to_text, parse_dialogue_text
+from repl.state.state_manager import create_initial_state, reset_sop_state
+from repl.state.session_manager import (
     create_session_dir,
     write_run_summary,
     save_session,
@@ -12,14 +12,13 @@ from repl.session_manager import (
     delete_session,
     generate_session_id,
 )
-from repl.sop_runner import run_sop_graph
-from repl.ui_renderer import (
+from repl.ui.ui_renderer import (
     print_welcome,
     print_user_message,
     print_agent_message,
     print_command_result,
 )
-from repl.app_builder import (
+from repl.ui.app_builder import (
     create_input_field,
     create_top_status_bar,
     create_status_bar,
@@ -27,7 +26,7 @@ from repl.app_builder import (
     create_layout,
     build_application,
 )
-from repl.session_picker import (
+from repl.pickers.session_picker import (
     create_picker_state,
     get_picker_condition,
     create_picker_control,
@@ -40,7 +39,7 @@ from repl.session_picker import (
     picker_select,
     picker_cancel,
 )
-from repl.sop_picker import (
+from repl.pickers.sop_picker import (
     create_sop_picker_state,
     get_sop_picker_condition,
     create_sop_picker_control,
@@ -54,9 +53,10 @@ from repl.sop_picker import (
     sop_picker_page_right,
     SOP_PICKER_HEIGHT,
 )
-from repl.llm_runner import run_llm_node, fmt_elapsed
-from repl.compaction_controller import run_chat_compactor, try_auto_compact
-from repl.session_controller import (
+from repl.execution.sop_runner import run_sop_graph
+from repl.execution.llm_runner import run_llm_node, fmt_elapsed
+from repl.execution.compaction_controller import run_chat_compactor, try_auto_compact
+from repl.commands.session_controller import (
     save_current_if_dirty,
     restore_session_fields,
     handle_new_session,
@@ -64,11 +64,11 @@ from repl.session_controller import (
     handle_load_session,
     handle_show_sop_picker,
 )
-from repl.execution_controller import execute_sop_flow
-from repl.keybindings import create_keybindings
-from repl.config_manager import get_config, reset_defaults, apply_config
+from repl.execution.execution_controller import execute_sop_flow
+from repl.ui.keybindings import create_keybindings
+from repl.state.config_manager import get_config, reset_defaults, apply_config
 from utils.tts_engine import tts_say
-from repl.config_picker import (
+from repl.pickers.config_picker import (
     create_config_picker_state,
     get_config_picker_condition,
     create_config_picker_control,
@@ -81,7 +81,7 @@ from repl.config_picker import (
     config_picker_adjust,
     CONFIG_PICKER_HEIGHT,
 )
-from repl.command_hint import (
+from repl.ui.command_hint import (
     create_command_hint_state,
     get_command_hint_condition,
     create_command_hint_control,
@@ -171,5 +171,3 @@ __all__ = [
     "COMMAND_HINT_HEIGHT",
     "tts_say",
 ]
-
-

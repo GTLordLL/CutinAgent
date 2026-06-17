@@ -4,8 +4,8 @@
 """
 
 from rich.panel import Panel
-from repl.llm_runner import run_llm_node
-from repl.config_manager import get_config
+from repl.execution.llm_runner import run_llm_node
+from repl.state.config_manager import get_config
 
 
 async def run_chat_compactor(chat_compactor_fn, state: dict,

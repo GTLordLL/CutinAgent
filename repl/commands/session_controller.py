@@ -6,14 +6,14 @@
 
 import shutil
 
-from repl.session_manager import (
+from repl.state.session_manager import (
     save_session,
     load_session,
     list_sessions,
     create_session_dir,
     generate_session_id,
 )
-from repl.session_picker import activate_picker, deactivate_picker
+from repl.pickers.session_picker import activate_picker, deactivate_picker
 from utils.debug_logger import set_session_dir
 from utils.tts_engine import tts_say
 
@@ -149,7 +149,7 @@ async def handle_show_sop_picker(sop_picker_state: dict, state: dict,
 
     current_ids = set(state.get("sop_ids", []))
 
-    from repl.sop_picker import activate_sop_picker, deactivate_sop_picker
+    from repl.pickers.sop_picker import activate_sop_picker, deactivate_sop_picker
     activate_sop_picker(sop_picker_state, sops, current_ids)
     app.invalidate()
 

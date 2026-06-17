@@ -46,7 +46,7 @@ def problem_analyzer_node(resources, headless=False):
 
         from validator.ProblemAnalyzerValidator import validate_analyzer_output
 
-        def map_result(parsed, thinker_tokens):
+        def map_result(parsed, thinker_tokens, **ctx):
             return {
                 "analyzer_current_state": parsed.get("current_state", ""),
                 "analyzer_confidence": parsed.get("confidence", "low"),

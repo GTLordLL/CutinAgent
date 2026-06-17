@@ -52,7 +52,7 @@ from repl import (
     create_keybindings,
 )
 from repl.repl_context import REPLContext
-from repl.input_handler import (
+from repl.execution.input_handler import (
     handle_user_input,
     repl_set_status,
     repl_sync_analysis_indicator,

@@ -51,7 +51,7 @@ def task_compactor_node(resources, headless=False):
 
         from validator.CompactorValidator import validate_compactor_output
 
-        def map_result(parsed, thinker_tokens):
+        def map_result(parsed, thinker_tokens, **ctx):
             return {
                 "compactor_evaluation": parsed.get("evaluation", ""),
                 "compactor_conversation_summary": parsed.get("conversation_summary", ""),

@@ -12,7 +12,7 @@ import asyncio
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.filters import Condition
 
-from repl.config_manager import get_config, apply_config, reset_defaults
+from repl.state.config_manager import get_config, apply_config, reset_defaults
 
 CONFIG_PICKER_HEIGHT = 13
 
@@ -110,58 +110,63 @@ def get_config_picker_condition(state: dict) -> Condition:
     return Condition(lambda: state["active"])
 
 
-# ── Render ────────────────────────────────────────────────
+# ── 渲染 ──────────────────────────────────────────────────
+
+def _build_config_picker_text(state: dict) -> str:
+    """根据 state 构建配置选择器的格式化文本。
+
+    从 create_config_picker_control 的 _get_text 闭包提取为纯函数，
+    便于独立测试渲染逻辑。
+    """
+    temp = state["temp_values"]
+    selected = state["selected_index"]
+
+    # ── 设置项行 ──
+    setting_lines = []
+    for i, s in enumerate(SETTINGS):
+        prefix = " >" if i == selected else "   "
+        hint = " ← →" if i == selected else ""
+        if s.get("type") == "bool":
+            val_display = "开启" if temp.get(s["key"], False) else "关闭"
+            setting_lines.append(
+                f"{prefix} {s['label']:　<9} {val_display:<5} {s['unit']:<7}{hint}"
+            )
+        elif s.get("type") == "choices":
+            cur_val = temp.get(s["key"], "")
+            display = cur_val
+            for val, name in s.get("choices", []):
+                if val == cur_val:
+                    display = name
+                    break
+            setting_lines.append(
+                f"{prefix} {s['label']:　<9} {display:<12} {s['unit']:<7}{hint}"
+            )
+        else:
+            val = temp.get(s["key"], 0)
+            setting_lines.append(
+                f"{prefix} {s['label']:　<9} {val:>5} {s['unit']:<7}{hint}"
+            )
+
+    # ── 按钮行 ──
+    save_prefix = " >" if selected == BUTTON_SAVE else "   "
+    reset_prefix = " >" if selected == BUTTON_RESET else "   "
+
+    lines = [
+        "",
+        "  全局设置",
+        "",
+        *setting_lines,
+        "",
+        f"{save_prefix} [ 保存 ]      {reset_prefix} [ 恢复默认 ]",
+        "",
+        "  ↑ ↓ 选择  ← → 调整  Enter 保存  Esc 取消",
+    ]
+    return "\n".join(lines)
+
 
 def create_config_picker_control(state: dict) -> FormattedTextControl:
     """创建全局设置渲染控件。"""
-
-    def _get_text():
-        temp = state["temp_values"]
-        selected = state["selected_index"]
-
-        # ── 设置项行 ──
-        setting_lines = []
-        for i, s in enumerate(SETTINGS):
-            prefix = " >" if i == selected else "   "
-            hint = " ← →" if i == selected else ""
-            if s.get("type") == "bool":
-                val_display = "开启" if temp.get(s["key"], False) else "关闭"
-                setting_lines.append(
-                    f"{prefix} {s['label']:　<9} {val_display:<5} {s['unit']:<7}{hint}"
-                )
-            elif s.get("type") == "choices":
-                cur_val = temp.get(s["key"], "")
-                display = cur_val
-                for val, name in s.get("choices", []):
-                    if val == cur_val:
-                        display = name
-                        break
-                setting_lines.append(
-                    f"{prefix} {s['label']:　<9} {display:<12} {s['unit']:<7}{hint}"
-                )
-            else:
-                val = temp.get(s["key"], 0)
-                setting_lines.append(
-                    f"{prefix} {s['label']:　<9} {val:>5} {s['unit']:<7}{hint}"
-                )
-
-        # ── 按钮行 ──
-        save_prefix = " >" if selected == BUTTON_SAVE else "   "
-        reset_prefix = " >" if selected == BUTTON_RESET else "   "
-
-        lines = [
-            "",
-            "  全局设置",
-            "",
-            *setting_lines,
-            "",
-            f"{save_prefix} [ 保存 ]      {reset_prefix} [ 恢复默认 ]",
-            "",
-            "  ↑ ↓ 选择  ← → 调整  Enter 保存  Esc 取消",
-        ]
-        return "\n".join(lines)
-
-    return FormattedTextControl(_get_text)
+    return FormattedTextControl(lambda: _build_config_picker_text(state))
 
 
 # ── Activate / Deactivate ─────────────────────────────────
@@ -180,6 +185,45 @@ def deactivate_config_picker(state: dict) -> dict:
     """关闭配置选择器，返回 result dict。"""
     state["active"] = False
     return state["result"]
+
+
+# ── 调整辅助函数 ───────────────────────────────────────────
+
+def _toggle_bool(state: dict, key: str, setting: dict) -> None:
+    """切换布尔型配置项。"""
+    state["temp_values"][key] = not state["temp_values"].get(key, False)
+
+
+def _cycle_choice(state: dict, key: str, setting: dict, direction: str) -> None:
+    """轮换选择型配置项。"""
+    choices = setting.get("choices", [])
+    if not choices:
+        return
+    cur_val = state["temp_values"].get(key, "")
+    idx = next((i for i, (v, _) in enumerate(choices) if v == cur_val), 0)
+    if direction == "right":
+        idx = (idx + 1) % len(choices)
+    else:
+        idx = (idx - 1) % len(choices)
+    state["temp_values"][key] = choices[idx][0]
+
+
+def _adjust_numeric(state: dict, key: str, setting: dict, direction: str) -> None:
+    """增减数值型配置项（支持字符串格式如 "+0%"）。"""
+    delta = setting["step"] * (-1 if direction == "left" else 1)
+    cur_val = state["temp_values"][key]
+    # 支持字符串格式值（如 tts_rate 的 "+0%"）
+    if isinstance(cur_val, str):
+        numeric = int(cur_val.replace("%", ""))
+    else:
+        numeric = cur_val
+    new_val = numeric + delta
+    new_val = max(setting["min"], min(setting["max"], new_val))
+    # 保持原始格式
+    if isinstance(cur_val, str):
+        state["temp_values"][key] = f"{new_val:+d}%"
+    else:
+        state["temp_values"][key] = new_val
 
 
 # ── Interaction Handlers ───────────────────────────────────
@@ -208,37 +252,11 @@ def config_picker_adjust(state: dict, direction: str):
     key = setting["key"]
 
     if setting.get("type") == "bool":
-        # 布尔型：Left/Right 切换 True/False
-        state["temp_values"][key] = not state["temp_values"].get(key, False)
-        return
-
-    if setting.get("type") == "choices":
-        choices = setting.get("choices", [])
-        if not choices:
-            return
-        cur_val = state["temp_values"].get(key, "")
-        idx = next((i for i, (v, _) in enumerate(choices) if v == cur_val), 0)
-        if direction == "right":
-            idx = (idx + 1) % len(choices)
-        else:
-            idx = (idx - 1) % len(choices)
-        state["temp_values"][key] = choices[idx][0]
-        return
-
-    delta = setting["step"] * (-1 if direction == "left" else 1)
-    cur_val = state["temp_values"][key]
-    # 支持字符串格式值（如 tts_rate 的 "+0%"）
-    if isinstance(cur_val, str):
-        numeric = int(cur_val.replace("%", ""))
+        _toggle_bool(state, key, setting)
+    elif setting.get("type") == "choices":
+        _cycle_choice(state, key, setting, direction)
     else:
-        numeric = cur_val
-    new_val = numeric + delta
-    new_val = max(setting["min"], min(setting["max"], new_val))
-    # 保持原始格式
-    if isinstance(cur_val, str):
-        state["temp_values"][key] = f"{new_val:+d}%"
-    else:
-        state["temp_values"][key] = new_val
+        _adjust_numeric(state, key, setting, direction)
 
 
 def config_picker_enter(state: dict):

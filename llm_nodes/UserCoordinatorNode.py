@@ -44,7 +44,7 @@ def user_coordinator_node(resources, headless=False):
 
         from validator.UserCoordinatorValidator import validate_coordinator_output
 
-        def map_result(parsed, thinker_tokens):
+        def map_result(parsed, thinker_tokens, **ctx):
             return {
                 "chat_message": parsed.get("chat_message", ""),
                 "matched_sop_id": parsed.get("sop_id", ""),

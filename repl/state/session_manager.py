@@ -2,7 +2,7 @@ import json
 import os as _os
 import uuid
 from datetime import datetime
-from repl.dialogue_utils import parse_dialogue_text
+from repl.commands.dialogue_utils import parse_dialogue_text
 
 _PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
 SESSIONS_DIR = _os.path.join(_PROJECT_ROOT, "user", "sessions")

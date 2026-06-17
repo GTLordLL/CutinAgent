@@ -12,7 +12,7 @@ from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.history import History
 from prompt_toolkit.completion import Completer
 
-from repl.config_manager import get_config
+from repl.state.config_manager import get_config
 
 
 class DialogueHistory(History):
@@ -203,13 +203,13 @@ def create_root_container(input_field: TextArea, top_status_control: FormattedTe
         if has_picker:
             _add_conditional_picker(bottom_elements, picker_control, picker_filter, 8)
         if has_sop_picker:
-            from repl.sop_picker import SOP_PICKER_HEIGHT
+            from repl.pickers.sop_picker import SOP_PICKER_HEIGHT
             _add_conditional_picker(bottom_elements, sop_picker_control, sop_picker_filter, SOP_PICKER_HEIGHT)
         if has_config_picker:
-            from repl.config_picker import CONFIG_PICKER_HEIGHT
+            from repl.pickers.config_picker import CONFIG_PICKER_HEIGHT
             _add_conditional_picker(bottom_elements, config_picker_control, config_picker_filter, CONFIG_PICKER_HEIGHT)
         if has_command_hint:
-            from repl.command_hint import COMMAND_HINT_HEIGHT
+            from repl.ui.command_hint import COMMAND_HINT_HEIGHT
             _add_conditional_picker(bottom_elements, command_hint_control, command_hint_filter, COMMAND_HINT_HEIGHT)
     else:
         bottom_elements = [

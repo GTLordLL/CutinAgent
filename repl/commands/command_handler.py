@@ -1,6 +1,6 @@
 from prompt_toolkit.completion import Completer, Completion
 from utils.sop_loader import build_sop_library_index
-from repl.dialogue_utils import dialogue_to_text
+from repl.commands.dialogue_utils import dialogue_to_text
 
 REPL_COMMANDS = ["/help", "/sops", "/history", "/clear", "/compact", "/config", "/resume", "/exit", "/quit", "/analyse"]
 

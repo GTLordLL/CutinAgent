@@ -6,6 +6,21 @@
 
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import has_focus
+from repl.pickers.session_picker import (
+    picker_select, picker_cancel,
+    picker_move_up, picker_move_down,
+    picker_page_left, picker_page_right,
+)
+from repl.pickers.sop_picker import (
+    sop_picker_enter, sop_picker_cancel,
+    sop_picker_move_up, sop_picker_move_down,
+    sop_picker_page_left, sop_picker_page_right,
+)
+from repl.pickers.config_picker import (
+    config_picker_enter, config_picker_cancel,
+    config_picker_move_up, config_picker_move_down,
+    config_picker_adjust,
+)
 
 
 def _get_user_messages(state: dict) -> list[str]:
@@ -112,6 +127,60 @@ def _register_picker_keybindings(kb, input_field, picker_filter, picker_state, a
             event.app.invalidate()
 
 
+def _register_enter_keybinding(
+    kb, input_field, flags, confirm_event, confirm_value, handle_input_coro
+) -> None:
+    """注册正常 Enter 键：确认等待 / 提交用户输入。"""
+
+    @kb.add("enter", filter=has_focus(input_field))
+    def _on_enter(event):
+        text = input_field.buffer.text
+        input_field.buffer.text = ""
+
+        # 重置历史导航状态
+        input_field._hist_index = None
+
+        if flags["waiting_confirm"]:
+            confirm_value["text"] = text
+            flags["waiting_confirm"] = False
+            confirm_event.set()
+        elif flags["processing"]:
+            pass  # 处理中，忽略输入
+        elif text.strip():
+            flags["processing"] = True
+            event.app.create_background_task(handle_input_coro(text.strip()))
+
+
+def _register_command_hint_keybindings(
+    kb, input_field, command_hint_state, command_hint_filter
+) -> None:
+    """注册命令提示的 4 个按键绑定 (up/down/escape/tab)。"""
+    from repl.ui.command_hint import (
+        command_hint_move_up, command_hint_move_down,
+        command_hint_dismiss, command_hint_complete,
+    )
+
+    @kb.add("up", filter=command_hint_filter)
+    def _on_cmd_hint_up(event):
+        command_hint_move_up(command_hint_state)
+        event.app.invalidate()
+
+    @kb.add("down", filter=command_hint_filter)
+    def _on_cmd_hint_down(event):
+        command_hint_move_down(command_hint_state)
+        event.app.invalidate()
+
+    @kb.add("escape", filter=command_hint_filter & has_focus(input_field))
+    def _on_cmd_hint_escape(event):
+        command_hint_dismiss(command_hint_state)
+        event.app.invalidate()
+
+    @kb.add("tab", filter=command_hint_filter & has_focus(input_field))
+    def _on_cmd_hint_tab(event):
+        command_hint_complete(command_hint_state, input_field)
+        event.app.invalidate()
+
+
 def create_keybindings(
     input_field,
     flags: dict,
@@ -149,24 +218,10 @@ def create_keybindings(
     """
     kb = KeyBindings()
 
-    # ── 正常 Enter：提交用户输入（multiline 下覆盖默认换行行为）──
-    @kb.add("enter", filter=has_focus(input_field))
-    def _on_enter(event):
-        text = input_field.buffer.text
-        input_field.buffer.text = ""
-
-        # 重置历史导航状态
-        input_field._hist_index = None
-
-        if flags["waiting_confirm"]:
-            confirm_value["text"] = text
-            flags["waiting_confirm"] = False
-            confirm_event.set()
-        elif flags["processing"]:
-            pass  # 处理中，忽略输入
-        elif text.strip():
-            flags["processing"] = True
-            event.app.create_background_task(handle_input_coro(text.strip()))
+    # ── 正常 Enter：提交用户输入 ──
+    _register_enter_keybinding(
+        kb, input_field, flags, confirm_event, confirm_value, handle_input_coro
+    )
 
     # ── Escape Enter：插入换行（multiline 模式下手动换行，替代不可检测的 Shift+Enter）──
     @kb.add("escape", "enter", filter=has_focus(input_field))
@@ -204,11 +259,6 @@ def create_keybindings(
         _navigate_history(input_field, direction="down")
 
     # ── 会话选择器按键 ──
-    from repl.session_picker import (
-        picker_select, picker_cancel,
-        picker_move_up, picker_move_down,
-        picker_page_left, picker_page_right,
-    )
     _register_picker_keybindings(kb, input_field, picker_filter, picker_state, {
         "enter": picker_select,
         "escape": picker_cancel,
@@ -220,11 +270,6 @@ def create_keybindings(
 
     # ── SOP 选择器按键 ──
     if sop_picker_state is not None and sop_picker_filter is not None:
-        from repl.sop_picker import (
-            sop_picker_enter, sop_picker_cancel,
-            sop_picker_move_up, sop_picker_move_down,
-            sop_picker_page_left, sop_picker_page_right,
-        )
         _register_picker_keybindings(kb, input_field, sop_picker_filter, sop_picker_state, {
             "enter": sop_picker_enter,
             "escape": sop_picker_cancel,
@@ -236,11 +281,6 @@ def create_keybindings(
 
     # ── 全局设置选择器按键 ──
     if config_picker_state is not None and config_picker_filter is not None:
-        from repl.config_picker import (
-            config_picker_enter, config_picker_cancel,
-            config_picker_move_up, config_picker_move_down,
-            config_picker_adjust,
-        )
         _register_picker_keybindings(kb, input_field, config_picker_filter, config_picker_state, {
             "enter": config_picker_enter,
             "escape": config_picker_cancel,
@@ -250,31 +290,10 @@ def create_keybindings(
             "right": lambda s: config_picker_adjust(s, direction="right"),
         })
 
-    # ── 命令提示按键：仅在 command hint 激活时生效 ──
+    # ── 命令提示按键 ──
     if command_hint_state is not None and command_hint_filter is not None:
-        from repl.command_hint import (
-            command_hint_move_up, command_hint_move_down,
-            command_hint_dismiss, command_hint_complete,
+        _register_command_hint_keybindings(
+            kb, input_field, command_hint_state, command_hint_filter
         )
-
-        @kb.add("up", filter=command_hint_filter)
-        def _on_cmd_hint_up(event):
-            command_hint_move_up(command_hint_state)
-            event.app.invalidate()
-
-        @kb.add("down", filter=command_hint_filter)
-        def _on_cmd_hint_down(event):
-            command_hint_move_down(command_hint_state)
-            event.app.invalidate()
-
-        @kb.add("escape", filter=command_hint_filter & has_focus(input_field))
-        def _on_cmd_hint_escape(event):
-            command_hint_dismiss(command_hint_state)
-            event.app.invalidate()
-
-        @kb.add("tab", filter=command_hint_filter & has_focus(input_field))
-        def _on_cmd_hint_tab(event):
-            command_hint_complete(command_hint_state, input_field)
-            event.app.invalidate()
 
     return kb

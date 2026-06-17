@@ -14,10 +14,10 @@ from rich.panel import Panel
 
 from utils.tts_engine import tts_say
 from data_nodes.VariableStore import clear as clear_variables, get_all as get_all_variables
-from repl.state_manager import reset_sop_state
-from repl.sop_runner import run_sop_graph, _iterate_graph_stream
-from repl.llm_runner import fmt_elapsed, run_llm_node_sync
-from repl.execution_helpers import (
+from repl.state.state_manager import reset_sop_state
+from repl.execution.sop_runner import run_sop_graph, _iterate_graph_stream
+from repl.execution.llm_runner import fmt_elapsed, run_llm_node_sync
+from repl.execution.execution_helpers import (
     detect_interrupt_resume,
     resume_state_fields,
     load_sop_and_init_state,
