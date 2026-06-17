@@ -24,15 +24,15 @@ TASK_STATUS: {FINISH|ONGOING|ERROR|INTERRUPT}
 
 Example 1 — Normal single tool call (ONGOING):
 ```
-NEXT_STEP: 2. 调用 check_network_port(port=22)，检查端口22的监听状态
-TOOL_CALL: check_network_port(port=22)
+NEXT_STEP: 2. 调用 run_command(command='ss -tlnp | grep :22')，检查端口22的监听状态
+TOOL_CALL: run_command(command='ss -tlnp | grep :22')
 TASK_STATUS: ONGOING
 ```
 
 Example 2 — Parallel static calls (ONGOING):
 ```
-NEXT_STEP: 1. 同时调用 get_system_health(target='all') 和 check_system_sync()，并行采集系统指标
-TOOL_CALL: get_system_health(target='all') | check_system_sync()
+NEXT_STEP: 1. 同时调用 get_system_health(target='all') 和 get_system_health(target='time')，并行采集系统指标和时间同步状态
+TOOL_CALL: get_system_health(target='all') | get_system_health(target='time')
 TASK_STATUS: ONGOING
 ```
 
@@ -45,8 +45,8 @@ TASK_STATUS: ONGOING
 
 Example 4 — Retry with modified parameters (ONGOING):
 ```
-NEXT_STEP: 3. 重试调用 check_network_port(port=8080)，调整端口号
-TOOL_CALL: check_network_port(port=8080)
+NEXT_STEP: 3. 重试调用 run_command(command='ss -tlnp | grep :8080')，调整端口号
+TOOL_CALL: run_command(command='ss -tlnp | grep :8080')
 TASK_STATUS: ONGOING
 ```
 

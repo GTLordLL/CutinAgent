@@ -1,9 +1,13 @@
 import psutil
 import os
+import subprocess
+import datetime
+import re
 
 def get_system_health(target="all", path="/"):
     """
     专家级系统健康诊断工具
+    target: all | cpu | load | mem | disk | time
     """
     try:
         report = []
@@ -20,10 +24,10 @@ def get_system_health(target="all", path="/"):
             load1, load5, load15 = psutil.getloadavg()
             raw_cpu_count = psutil.cpu_count()
             cpu_count = raw_cpu_count if raw_cpu_count is not None else 1
-            
+
             # 计算利用率百分比，让模型更直观理解
             load_usage_pct = round((load1 / cpu_count) * 100, 2)
-            
+
             # 趋势分析：比较 1分钟 和 15分钟 负载
             if load1 > load15 * 1.2:
                 trend = "上升趋势"
@@ -33,7 +37,7 @@ def get_system_health(target="all", path="/"):
                 trend = "平稳"
 
             status = "正常" if (load1 / cpu_count) < 0.7 else "负载较高"
-            
+
             # 核心优化：提供保留2位小数的数值，并增加语义化描述
             load_msg = (
                 f"系统平均负载: [1min:{load1:.2f}, 5min:{load5:.2f}, 15min:{load15:.2f}] "
@@ -55,6 +59,25 @@ def get_system_health(target="all", path="/"):
                 report.append(f"磁盘({path}): {usage.percent}% (剩余: {usage.free // (1024**3)}GB, 状态: {status})")
             else:
                 return f"失败 | 指定路径 {path} 不存在"
+
+        # 5. 时间同步诊断 (吸收原 check_system_sync)
+        if target in ["all", "time"]:
+            local_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                timezone = subprocess.check_output(["date", "+%Z"], universal_newlines=True).strip()
+            except Exception:
+                timezone = "未知"
+
+            sync_status = "未知"
+            try:
+                ntp_output = subprocess.check_output(["timedatectl", "show"], universal_newlines=True)
+                is_synced = "NTPSynchronized=yes" in ntp_output
+                sync_status = "已同步" if is_synced else "未同步/正在同步"
+            except Exception:
+                sync_status = "无法获取(timedatectl不可用)"
+
+            time_judgment = "时间状态正常" if sync_status == "已同步" else "警告：系统时间可能未同步，可能导致证书校验失败或分布式日志错乱。"
+            report.append(f"时间: {local_time} {timezone} (NTP: {sync_status}, {time_judgment})")
 
         # 组装最终结论
         header = f"[{target.upper()}专项报告]" if target != "all" else "[系统全局概览]"

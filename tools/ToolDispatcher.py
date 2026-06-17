@@ -10,6 +10,10 @@ from tools.git_ops.git_push import git_push
 from tools.git_ops.generate_pr_description import generate_pr_description
 from tools.git_ops.get_git_conflicts import get_git_conflicts
 from tools.git_ops.create_pr import create_pr
+from tools.linux_ops.get_system_health import get_system_health
+from tools.linux_ops.list_top_processes import list_top_processes
+from tools.linux_ops.run_command import run_command
+from tools.linux_ops.check_file_access import check_file_access
 from data_nodes.VariableStore import resolve as resolve_variable
 
 
@@ -28,6 +32,10 @@ class ToolDispatcher:
             "generate_pr_description": generate_pr_description,
             "get_git_conflicts": get_git_conflicts,
             "create_pr": create_pr,
+            "get_system_health": get_system_health,
+            "list_top_processes": list_top_processes,
+            "run_command": run_command,
+            "check_file_access": check_file_access,
         }
 
     def dispatch(self, tool_id: str, args: dict):

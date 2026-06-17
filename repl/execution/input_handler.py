@@ -264,7 +264,7 @@ async def _execute_analyzer_tool_calls(
             f"[Analyzer Round {round_num}] "
             f"{tool_id}({', '.join(f'{k}={v}' for k, v in args.items())}): "
             f"status=\"{result.get('status', '?')}\", "
-            f"summary=\"{result.get('summary', result.get('conclusion', ''))[:200]}\""
+            f"detail=\"{result.get('detail', result.get('conclusion', ''))[:500]}\""
         )
         current_exec = ctx.state.get("execution_history", "")
         ctx.state["execution_history"] = (
