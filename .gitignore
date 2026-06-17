@@ -16,7 +16,7 @@ dist/
 # --- 运行时数据 ---
 history/
 user/sessions/
-repl/user/config/user_config.json
+user/config/user_config.json
 
 # --- 内部讨论 ---
 intro/discuss/
