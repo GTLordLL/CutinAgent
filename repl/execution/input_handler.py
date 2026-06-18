@@ -247,7 +247,10 @@ async def _execute_analyzer_tool_calls(
     calls = _split_parallel_calls(tool_call)
     repl_set_status(ctx, f"执行工具: {tool_call[:50]}...")
     for call_str in calls:
-        parsed = parse_single_call(call_str)
+        # 先提取 tool_id 以获取参数名列表，支持位置参数解析
+        tool_id_hint = call_str.split("(")[0].strip() if "(" in call_str else ""
+        param_names = ctx.tool_dispatcher.get_param_names(tool_id_hint) if tool_id_hint else []
+        parsed = parse_single_call(call_str, param_names)
         if parsed is None:
             ctx.console.print(
                 f"[dim][ProblemAnalyzer] 工具调用解析失败: "

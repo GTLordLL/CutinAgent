@@ -38,6 +38,17 @@ class ToolDispatcher:
             "check_file_access": check_file_access,
         }
 
+    def get_param_names(self, tool_id: str) -> list[str]:
+        """返回工具函数的参数名列表（按顺序），用于位置参数解析。"""
+        import inspect
+        func = self.toolbox.get(tool_id)
+        if func is None:
+            return []
+        try:
+            return list(inspect.signature(func).parameters.keys())
+        except (ValueError, TypeError):
+            return []
+
     def dispatch(self, tool_id: str, args: dict):
         if tool_id not in self.toolbox:
             return {"status": "失败", "summary": f"未找到工具 ID: {tool_id}", "detail": ""}

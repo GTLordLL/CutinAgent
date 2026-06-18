@@ -49,7 +49,7 @@ Conclude with a clear summary of your analysis and decision:
 - **CURRENT_STATE**: A concise factual summary of the current state — what is known and optionally what remains unknown.
 - **CONFIDENCE**: Your assessed confidence level — `high`, `medium`, or `low`.
 - **TOOL_CALL**: The executable tool call string(s) following Python function call syntax: strings single-quoted, integers bare, booleans omitted (use default). Single call: `Tool_ID(param='value', ...)`. Multiple parallel calls: `Tool_ID(...) | Tool_ID(...)`. Write `None` if no tools were selected.
-- **MY_UNDERSTANDING**: Output only when CONFIDENCE is `high`. State your single best inference of the user's core intent and need — what they are really trying to accomplish. Write `None` if CONFIDENCE is not high.
+- **MY_UNDERSTANDING**: State your best inference of the user's core intent and need — what they are really trying to accomplish. Write `None` only when there is genuinely not enough information to form any reasonable inference.
 
 ## Output Requirement
 Provide a step-by-step reasoning chain.

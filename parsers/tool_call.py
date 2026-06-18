@@ -79,13 +79,61 @@ def _split_parallel_calls(tool_call_raw: str) -> list[str]:
     return parts
 
 
-def parse_single_call(call_str: str) -> tuple | None:
+def _extract_positional_args(args_str: str) -> list[str]:
+    """从函数调用参数字符串中按顺序提取位置参数值。
+
+    支持单引号字符串、双引号字符串、裸数字/标识符。
+    引号内逗号和括号不会被当作分隔符。
+    """
+    result = []
+    i = 0
+    n = len(args_str)
+    while i < n:
+        ch = args_str[i]
+        if ch in (' ', ','):
+            i += 1
+            continue
+        if ch == "'":
+            j = i + 1
+            while j < n and args_str[j] != "'":
+                if args_str[j] == '\\':
+                    j += 1
+                j += 1
+            result.append(args_str[i + 1:j])
+            i = j + 1
+            continue
+        if ch == '"':
+            j = i + 1
+            while j < n and args_str[j] != '"':
+                if args_str[j] == '\\':
+                    j += 1
+                j += 1
+            result.append(args_str[i + 1:j])
+            i = j + 1
+            continue
+        # 裸值 (数字 / 标识符 / bool)
+        j = i
+        while j < n and args_str[j] not in (' ', ',', ')'):
+            j += 1
+        if j > i:
+            result.append(args_str[i:j])
+            i = j
+            continue
+        i += 1
+    return result
+
+
+def parse_single_call(call_str: str, param_names: list[str] | None = None) -> tuple | None:
     """Parse a single tool call string into (tool_id, args_dict).
 
     Handles formats like:
         Tool_ID()                          → ('Tool_ID', {})
         Tool_ID(count=10)                  → ('Tool_ID', {'count': 10})
         Tool_ID(staged='false', base='')   → ('Tool_ID', {'staged': 'false', 'base': ''})
+
+    Positional arguments (without key=) are also supported when param_names
+    is provided — they are mapped to param_names by position:
+        run_command('git status')          → ('run_command', {'command': 'git status'})
 
     Returns None if the call string cannot be parsed.
     """
@@ -113,4 +161,12 @@ def parse_single_call(call_str: str) -> tuple | None:
             else:
                 continue
             args[key] = val
+
+        # Fallback: positional arguments (when no key=value pairs matched)
+        if not args and param_names:
+            pos_vals = _extract_positional_args(args_str)
+            for i, val in enumerate(pos_vals):
+                if i < len(param_names):
+                    args[param_names[i]] = val
+
     return tool_id, args
