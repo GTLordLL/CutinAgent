@@ -260,7 +260,7 @@ async def _execute_analyzer_tool_calls(
             f"({', '.join(f'{k}={v}' for k, v in args.items())})[/dim]"
         )
         result = ctx.tool_dispatcher.dispatch(tool_id, args)
-        detail_val = result.get('detail') or result.get('conclusion', '')
+        detail_val = result.get('detail') or result.get('summary', '')
         exec_entry = (
             f"[Analyzer Round {round_num}] "
             f"{tool_id}({', '.join(f'{k}={v}' for k, v in args.items())}): "

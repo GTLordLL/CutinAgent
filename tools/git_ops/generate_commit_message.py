@@ -46,11 +46,10 @@ def generate_commit_message(data: str) -> dict:
 
         return {
             "status": "成功",
-            "conclusion": "已生成 Commit Message",
-            "summary": message,
+            "summary": "已生成 Commit Message",
             "detail": message,
             "token_usage": usage,
         }
 
     except Exception as e:
-        return {"status": "失败", "conclusion": f"生成 commit message 时发生异常: {str(e)}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"生成 commit message 时发生异常: {str(e)}", "detail": ""}

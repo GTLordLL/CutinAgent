@@ -7,7 +7,7 @@ from utils.debug_logger import log_state_snapshot
 from utils.cancel_token import check_cancel
 from utils.tts_engine import tts_say
 
-# 报告类工具的 conclusion 值 —— 匹配时立即 TTS 播报
+# 报告类工具的 summary 值 —— 匹配时立即 TTS 播报
 _REPORT_CONCLUSIONS = {
     "已生成今日变更日报",
     "已生成 Commit Message",
@@ -28,13 +28,10 @@ def _build_detail_lines(node_name: str, output: dict) -> list[str]:
 
     elif node_name == "tool_executor":
         ts_out = output.get("tool_status", "")
-        tc = output.get("tool_conclusion", "")
         tsm = output.get("tool_summary", "")
         tdv = output.get("tool_detail_var", "")
         detail_lines.append(f"状态: {ts_out}")
-        detail_lines.append(f"结论: {tc}")
-        if tsm:
-            detail_lines.append(f"摘要: {tsm}")
+        detail_lines.append(f"摘要: {tsm}")
         if tdv:
             detail_lines.append(f"变量: {tdv}")
 
@@ -86,8 +83,7 @@ def _iterate_graph_stream(app, state: dict, node_callback=None):
 
                 # 报告类工具立即 TTS 播报（不等 SOP 执行完毕）
                 tsm = output.get("tool_summary", "")
-                tc = output.get("tool_conclusion", "")
-                if node_name == "tool_executor" and tsm and tc in _REPORT_CONCLUSIONS:
+                if node_name == "tool_executor" and tsm and tsm in _REPORT_CONCLUSIONS:
                     tts_say(tsm)
 
                 # 回调：TUI 模式渲染 Panel，headless 模式收集静默
@@ -137,9 +133,8 @@ def run_sop_graph(app, state: dict, console=None) -> tuple[dict, list, str, int,
         tool_summary = output.get("tool_summary", "")
         if node_name == "tool_executor" and tool_summary:
             ts_out = output.get("tool_status", "")
-            tc = output.get("tool_conclusion", "")
             tdv = output.get("tool_detail_var", "")
-            meta = f"状态: {ts_out}\n结论: {tc}"
+            meta = f"状态: {ts_out}\n摘要: {tool_summary[:200]}"
             if tdv:
                 meta += f"\n变量: {tdv}"
             body = Group(

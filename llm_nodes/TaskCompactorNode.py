@@ -28,12 +28,10 @@ def task_compactor_node(resources, headless=False):
 
         # 构造执行结果摘要
         tool_status = state.get("tool_status", "")
-        tool_conclusion = state.get("tool_conclusion", "")
         tool_summary = state.get("tool_summary", "")
         sop_plan_steps = state.get("sop_plan_steps", "")
         latest_execution = (
             f"Status: {tool_status}\n"
-            f"Conclusion: {tool_conclusion}\n"
             f"Summary: {tool_summary}\n"
             f"SOP Plan with Progress:\n{sop_plan_steps}"
         )

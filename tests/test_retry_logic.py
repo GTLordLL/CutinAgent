@@ -21,14 +21,13 @@ from data_nodes.ProgressUpdater import (
 
 
 def make_state(sop_plan_steps, last_step, tool_call_raw,
-               status, conclusion, summary="", detail_var="",
+               status, summary, detail_var="",
                retry_limit=3, current_round=0):
     return {
         "sop_plan_steps": sop_plan_steps,
         "last_step": last_step,
         "current_tool_call_raw": tool_call_raw,
         "tool_status": status,
-        "tool_conclusion": conclusion,
         "tool_summary": summary,
         "tool_detail_var": detail_var,
         "retry_limit": retry_limit,
@@ -66,8 +65,8 @@ def test_failure_then_retry_success():
     # 第3次执行：LLM 再次重试（改参数后成功）
     state3 = make_state(plan2, "1. 调用 check_file_access(path='/var/log')",
                         "check_file_access(path='/var/log')",
-                        "成功", "可读可进入",
-                        "drwxr-xr-x root root", "VAR_check_file_access")
+                        "成功", "可读可进入 | drwxr-xr-x root root",
+                        "VAR_check_file_access")
     result3 = progress_updater_node(state3)
     plan3 = result3["sop_plan_steps"]
     print(f"  第3次(成功): {plan3}")
@@ -88,8 +87,7 @@ def test_success_then_retry():
     # 首次执行：成功
     state = make_state(plan, "1. 调用 get_system_health(target='cpu')",
                        "get_system_health(target='cpu')",
-                       "成功", "CPU使用率: 45% (正常)",
-                       "CPU 45%, 状态正常",
+                       "成功", "CPU使用率: 45% (正常) | CPU 45%, 状态正常",
                        "VAR_get_system_health")
     result = progress_updater_node(state)
     plan1 = result["sop_plan_steps"]
@@ -102,8 +100,7 @@ def test_success_then_retry():
     # LLM 决定重新执行（换个参数重试）
     state2 = make_state(plan1, "1. 调用 get_system_health(target='cpu')",
                         "get_system_health(target='cpu')",
-                        "成功", "CPU使用率: 72% (正常)",
-                        "CPU 72%, 负载上升中",
+                        "成功", "CPU使用率: 72% (正常) | CPU 72%, 负载上升中",
                         "VAR_get_system_health_2")
     result2 = progress_updater_node(state2)
     plan2 = result2["sop_plan_steps"]
@@ -175,8 +172,8 @@ def test_skipped_step_reexecuted():
     # LLM 决定重新执行步骤2（原来被跳过的）
     state = make_state(plan_with_skip, "2. 调用 get_system_health(target='cpu')",
                        "get_system_health(target='cpu')",
-                       "成功", "CPU使用率: 45% (正常)",
-                       "CPU 45%, 状态正常", "VAR_get_system_health")
+                       "成功", "CPU使用率: 45% (正常) | CPU 45%, 状态正常",
+                       "VAR_get_system_health")
     result = progress_updater_node(state)
     plan_out = result["sop_plan_steps"]
     print(f"  重新执行已跳过步骤: {plan_out}")
@@ -199,8 +196,8 @@ def test_no_double_result_mark():
     # 连续执行3次（模拟LLM反复重试且每次都成功）
     state = make_state(plan, "1. 调用 get_system_health(target='disk')",
                        "get_system_health(target='disk')",
-                       "成功", "磁盘: 41% (正常)",
-                       "磁盘 41%, 剩余 200GB", "VAR_get_system_health")
+                       "成功", "磁盘: 41% (正常) | 磁盘 41%, 剩余 200GB",
+                       "VAR_get_system_health")
     result = progress_updater_node(state)
     plan_cur = result["sop_plan_steps"]
     assert plan_cur.count("结果:") == 1
@@ -208,8 +205,8 @@ def test_no_double_result_mark():
     for i in range(2):
         state_r = make_state(plan_cur, "1. 调用 get_system_health(target='disk')",
                              "get_system_health(target='disk')",
-                             "成功", "磁盘: 43% (正常)",
-                             "磁盘 43%, 剩余 198GB", "VAR_get_system_health_2")
+                             "成功", "磁盘: 43% (正常) | 磁盘 43%, 剩余 198GB",
+                             "VAR_get_system_health_2")
         result = progress_updater_node(state_r)
         plan_cur = result["sop_plan_steps"]
         assert plan_cur.count("结果:") == 1, f"第{i+2}次执行出现双结果: {plan_cur}"

@@ -151,13 +151,12 @@ def _build_sub_sop_result(sub_state: dict) -> dict:
     """从子 SOP 执行完毕后的状态构建返回值。"""
     return {
         "status": sub_state["task_status"],        # FINISH / ERROR / INTERRUPT
-        "conclusion": sub_state.get("execution_result", ""),  # 最终执行结果
-        "summary": sub_state.get("sop_plan_steps", ""),      # 子SOP的进度标记（可展开查看）
+        "summary": sub_state.get("execution_result", ""),  # 最终执行结果
         "detail": sub_state.get("final_report", ""),          # 子SOP的最终报告（存入变量）
     }
 ```
 
-这个返回值遵循工具合约的四字段格式（`status/conclusion/summary/detail`），因此父 SOP 的 ProgressUpdater **无需修改**即可处理子 SOP 返回结果——子 SOP 在父 SOP 看来就是一个特殊的"工具调用"。
+这个返回值遵循工具合约的三字段格式（`status/summary/detail`），因此父 SOP 的 ProgressUpdater **无需修改**即可处理子 SOP 返回结果——子 SOP 在父 SOP 看来就是一个特殊的"工具调用"。
 
 ### ProgressUpdater 变更
 
@@ -165,9 +164,9 @@ ProgressUpdater 新增第五种更新模式 `_update_call_sop`：
 
 ```python
 def _update_call_sop(step: dict, sub_sop_id: str, status: str,
-                     conclusion: str, summary: str, detail_var: str):
+                     summary: str, detail_var: str):
     """为 CALL_SOP 步骤追加子 SOP 执行结果标记。"""
-    formatted = _format_result(status, conclusion, summary, detail_var)
+    formatted = _format_result(status, summary, detail_var)
     base = re.sub(r'\s*已跳过.*$', '', step['header'])
     step['header'] = f"{base} 子SOP[{sub_sop_id}] 结果: {formatted}。"
     step['sub_lines'] = []
@@ -340,9 +339,9 @@ CALL_SOP 的引入不强制所有 SOP 使用嵌套。一个只有 4 个工具的
 
 静态检测只需要加载所有 SOP 的 Plan_Steps 并提取 `CALL_SOP` 引用边，构建有向图做 DFS——这是 O(V+E) 的经典算法，加载时多花几毫秒即可。
 
-### 子 SOP 结果遵循工具四字段契约让 ProgressUpdater 无需修改
+### 子 SOP 结果遵循工具三字段契约让 ProgressUpdater 无需修改
 
-设计决策：子 SOP 返回结果采用与工具调用相同的四字段格式（status/conclusion/summary/detail）。这意味着 ProgressUpdater 的 `_update_call_sop` 可以直接复用 `_format_result` 和现有的格式化逻辑——不需要为子 SOP 单独写一套进度标记格式。
+设计决策：子 SOP 返回结果采用与工具调用相同的三字段格式（status/summary/detail）。这意味着 ProgressUpdater 的 `_update_call_sop` 可以直接复用 `_format_result` 和现有的格式化逻辑——不需要为子 SOP 单独写一套进度标记格式。
 
 这也是为什么 `parsers/sop_plan.py` 中 `CALL_SOP` 的优先级在 CONDITIONAL 之前——子 SOP 调用可以在条件分支中出现（`如果日报生成成功，就调用 GIT_SMART_COMMIT`），而条件分支内的子 SOP 的进度更新逻辑和普通工具完全一致。
 

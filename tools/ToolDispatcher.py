@@ -40,14 +40,14 @@ class ToolDispatcher:
 
     def dispatch(self, tool_id: str, args: dict):
         if tool_id not in self.toolbox:
-            return {"status": "失败", "conclusion": f"未找到工具 ID: {tool_id}", "summary": "", "detail": ""}
+            return {"status": "失败", "summary": f"未找到工具 ID: {tool_id}", "detail": ""}
         try:
             resolved_args = {}
             for key, value in args.items():
                 if isinstance(value, str) and value.startswith("VAR_"):
                     resolved = resolve_variable(value)
                     if not resolved:
-                        return {"status": "失败", "conclusion": f"变量 {value} 未找到或已过期", "summary": "", "detail": ""}
+                        return {"status": "失败", "summary": f"变量 {value} 未找到或已过期", "detail": ""}
                     resolved_args[key] = resolved
                 else:
                     resolved_args[key] = value
@@ -55,6 +55,6 @@ class ToolDispatcher:
             func = self.toolbox[tool_id]
             return func(**resolved_args)
         except TypeError as e:
-            return {"status": "失败", "conclusion": f"参数错误: {str(e)}", "summary": "", "detail": ""}
+            return {"status": "失败", "summary": f"参数错误: {str(e)}", "detail": ""}
         except Exception as e:
-            return {"status": "失败", "conclusion": f"执行异常: {str(e)}", "summary": "", "detail": ""}
+            return {"status": "失败", "summary": f"执行异常: {str(e)}", "detail": ""}

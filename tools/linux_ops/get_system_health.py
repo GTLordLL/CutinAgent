@@ -58,7 +58,7 @@ def get_system_health(target="all", path="/"):
                 status = "正常" if usage.percent < 85 else "空间不足[警告]"
                 report.append(f"磁盘({path}): {usage.percent}% (剩余: {usage.free // (1024**3)}GB, 状态: {status})")
             else:
-                return f"失败 | 指定路径 {path} 不存在"
+                return {"status": "失败", "summary": f"指定路径 {path} 不存在", "detail": ""}
 
         # 5. 时间同步诊断 (吸收原 check_system_sync)
         if target in ["all", "time"]:
@@ -79,10 +79,10 @@ def get_system_health(target="all", path="/"):
             time_judgment = "时间状态正常" if sync_status == "已同步" else "警告：系统时间可能未同步，可能导致证书校验失败或分布式日志错乱。"
             report.append(f"时间: {local_time} {timezone} (NTP: {sync_status}, {time_judgment})")
 
-        # 组装最终结论
+        # 组装返回 dict
         header = f"[{target.upper()}专项报告]" if target != "all" else "[系统全局概览]"
-        conclusion = f"成功 | {header} " + " | ".join(report)
-        return conclusion
+        summary = f"{header} " + " | ".join(report)
+        return {"status": "成功", "summary": summary, "detail": ""}
 
     except Exception as e:
-        return f"失败 | 诊断过程中发生异常: {str(e)}"
+        return {"status": "失败", "summary": f"诊断过程中发生异常: {str(e)}", "detail": ""}

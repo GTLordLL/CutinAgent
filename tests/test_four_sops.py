@@ -109,7 +109,6 @@ def run_sop_test(sop_id: str, resources, app_graph, original_cwd: str) -> dict:
         state["current_tool_calls"] = []
         state["execution_result"] = ""
         state["tool_status"] = ""
-        state["tool_conclusion"] = ""
         state["tool_summary"] = ""
         state["tool_detail_var"] = ""
         state["last_step"] = ""
@@ -131,7 +130,7 @@ def run_sop_test(sop_id: str, resources, app_graph, original_cwd: str) -> dict:
             if no["node_name"] == "tool_executor":
                 result["tool_outputs"].append({
                     "status": no["output"].get("tool_status", ""),
-                    "conclusion": no["output"].get("tool_conclusion", ""),
+                    "summary": no["output"].get("tool_summary", ""),
                 })
 
         # ── 4. TaskCompactor ──
@@ -226,7 +225,7 @@ def main():
         if result["tool_outputs"]:
             print(f"\n  {C_YELLOW}工具执行记录:{C_RESET}")
             for i, to in enumerate(result["tool_outputs"]):
-                print(f"    [{to['status']}] {to['conclusion'][:120]}")
+                print(f"    [{to['status']}] {to['summary'][:120]}")
 
         # 打印最终 SOP_PLAN
         plan = result.get("sop_plan_final", "")

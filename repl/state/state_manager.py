@@ -21,7 +21,6 @@ def create_initial_state(user_query: str, session_dir: str,
         "execution_result": "",
 
         "tool_status": "",
-        "tool_conclusion": "",
         "tool_summary": "",
         "tool_detail_var": "",
 
@@ -71,7 +70,6 @@ def reset_sop_state(state: dict) -> dict:
         "current_tool_calls": [],
         "execution_result": "",
         "tool_status": "",
-        "tool_conclusion": "",
         "tool_summary": "",
         "tool_detail_var": "",
         "last_step": "",

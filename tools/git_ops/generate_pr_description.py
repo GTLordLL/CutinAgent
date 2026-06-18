@@ -61,8 +61,7 @@ def generate_pr_description(diff: str, commits: str) -> dict:
 
         return {
             "status": "成功",
-            "conclusion": "已生成 PR 描述",
-            "summary": description if len(description) <= 500 else description[:500] + "...",
+            "summary": "已生成 PR 描述",
             "detail": description,
             "token_usage": usage,
         }
@@ -70,7 +69,6 @@ def generate_pr_description(diff: str, commits: str) -> dict:
     except Exception as e:
         return {
             "status": "失败",
-            "conclusion": f"生成 PR 描述时发生异常: {str(e)}",
-            "summary": "",
+            "summary": f"生成 PR 描述时发生异常: {str(e)}",
             "detail": "",
         }

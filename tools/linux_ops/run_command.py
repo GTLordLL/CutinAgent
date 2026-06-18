@@ -116,8 +116,7 @@ def run_command(command: str) -> dict:
         if re.search(pattern, cmd):
             return {
                 "status": "失败",
-                "conclusion": f"安全拦截: {error_msg}",
-                "summary": "",
+                "summary": f"安全拦截: {error_msg}",
                 "detail": "",
             }
 
@@ -126,8 +125,7 @@ def run_command(command: str) -> dict:
     if not binaries:
         return {
             "status": "失败",
-            "conclusion": "安全拦截: 无法解析命令中的二进制名称",
-            "summary": "",
+            "summary": "安全拦截: 无法解析命令中的二进制名称",
             "detail": "",
         }
 
@@ -135,8 +133,7 @@ def run_command(command: str) -> dict:
         if name not in WHITELIST_BINARIES:
             return {
                 "status": "失败",
-                "conclusion": f"安全拦截: 命令 '{name}' 不在只读白名单中",
-                "summary": "",
+                "summary": f"安全拦截: 命令 '{name}' 不在只读白名单中",
                 "detail": "",
             }
 
@@ -149,8 +146,7 @@ def run_command(command: str) -> dict:
                 if subcmd not in SYSTEMCTL_RO_SUBCMDS:
                     return {
                         "status": "失败",
-                        "conclusion": f"安全拦截: systemctl 子命令 '{subcmd}' 不允许，仅限只读子命令",
-                        "summary": "",
+                        "summary": f"安全拦截: systemctl 子命令 '{subcmd}' 不允许，仅限只读子命令",
                         "detail": "",
                     }
 
@@ -159,8 +155,7 @@ def run_command(command: str) -> dict:
         if CURL_WGET_BLOCKED.search(cmd):
             return {
                 "status": "失败",
-                "conclusion": "安全拦截: curl/wget 禁止 -o/-O/--output 写文件选项",
-                "summary": "",
+                "summary": "安全拦截: curl/wget 禁止 -o/-O/--output 写文件选项",
                 "detail": "",
             }
 
@@ -169,8 +164,7 @@ def run_command(command: str) -> dict:
         if TAR_BLOCKED.search(cmd):
             return {
                 "status": "失败",
-                "conclusion": "安全拦截: tar 仅允许 -t (列出) 模式，禁止解包/创建/删除",
-                "summary": "",
+                "summary": "安全拦截: tar 仅允许 -t (列出) 模式，禁止解包/创建/删除",
                 "detail": "",
             }
 
@@ -191,30 +185,27 @@ def run_command(command: str) -> dict:
         if len(output) > 2000:
             output = output[:2000] + f"\n... (截断，原始 {len(output)} 字符)"
 
-        conclusion = (
+        summary_text = (
             f"命令完成 (exit {result.returncode}), "
             f"{line_count} 行输出, 耗时 {elapsed:.1f}秒"
         )
 
         return {
             "status": "成功",
-            "conclusion": conclusion,
-            "summary": "",
+            "summary": summary_text,
             "detail": output,
         }
 
     except subprocess.TimeoutExpired:
         return {
             "status": "失败",
-            "conclusion": "命令执行超时 (15秒)",
-            "summary": "",
+            "summary": "命令执行超时 (15秒)",
             "detail": "",
         }
     except Exception as e:
         return {
             "status": "失败",
-            "conclusion": f"命令执行异常: {str(e)}",
-            "summary": "",
+            "summary": f"命令执行异常: {str(e)}",
             "detail": "",
         }
 

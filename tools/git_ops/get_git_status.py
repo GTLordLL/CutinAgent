@@ -17,8 +17,7 @@ def get_git_status() -> dict:
         if not porcelain.strip():
             return {
                 "status": "成功",
-                "conclusion": f"分支 '{branch}' 工作区干净，没有待提交的变更。",
-                "summary": "",
+                "summary": f"分支 '{branch}' 工作区干净，没有待提交的变更。",
                 "detail": "",
             }
 
@@ -30,14 +29,13 @@ def get_git_status() -> dict:
 
         return {
             "status": "成功",
-            "conclusion": f"分支 '{branch}' 有未提交变更",
-            "summary": f"已暂存 {staged}、已修改 {modified}、未跟踪 {untracked}、已删除 {deleted}",
+            "summary": f"分支 '{branch}' 有未提交变更",
             "detail": porcelain.strip(),
         }
 
     except subprocess.CalledProcessError as e:
-        return {"status": "失败", "conclusion": f"git status 执行出错: {e.output.strip()}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"git status 执行出错: {e.output.strip()}", "detail": ""}
     except FileNotFoundError:
-        return {"status": "失败", "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未找到 git 命令，请确认当前目录是 git 仓库。", "detail": ""}
     except Exception as e:
-        return {"status": "失败", "conclusion": f"获取工作区状态异常: {str(e)}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"获取工作区状态异常: {str(e)}", "detail": ""}

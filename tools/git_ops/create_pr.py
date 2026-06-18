@@ -37,8 +37,7 @@ def create_pr(data: str, base: str = "main", draft: str = "false") -> dict:
         except FileNotFoundError:
             return {
                 "status": "失败",
-                "conclusion": "未找到 gh CLI，请安装 GitHub CLI 并执行 gh auth login 进行认证。",
-                "summary": "",
+                "summary": "未找到 gh CLI，请安装 GitHub CLI 并执行 gh auth login 进行认证。",
                 "detail": "",
             }
 
@@ -51,8 +50,7 @@ def create_pr(data: str, base: str = "main", draft: str = "false") -> dict:
         except subprocess.CalledProcessError:
             return {
                 "status": "失败",
-                "conclusion": "gh 未登录，请执行 gh auth login 进行认证。",
-                "summary": "",
+                "summary": "gh 未登录，请执行 gh auth login 进行认证。",
                 "detail": "",
             }
 
@@ -65,16 +63,14 @@ def create_pr(data: str, base: str = "main", draft: str = "false") -> dict:
         except subprocess.CalledProcessError:
             return {
                 "status": "失败",
-                "conclusion": "无法获取当前分支名，请确认在 git 仓库中。",
-                "summary": "",
+                "summary": "无法获取当前分支名，请确认在 git 仓库中。",
                 "detail": "",
             }
 
         if not head:
             return {
                 "status": "失败",
-                "conclusion": "当前处于 detached HEAD 状态，无法创建 PR。",
-                "summary": "",
+                "summary": "当前处于 detached HEAD 状态，无法创建 PR。",
                 "detail": "",
             }
 
@@ -94,8 +90,7 @@ def create_pr(data: str, base: str = "main", draft: str = "false") -> dict:
         if existing:
             return {
                 "status": "失败",
-                "conclusion": f"分支 '{head}' 已存在 PR: {existing}",
-                "summary": "",
+                "summary": f"分支 '{head}' 已存在 PR: {existing}",
                 "detail": existing,
             }
 
@@ -118,7 +113,6 @@ def create_pr(data: str, base: str = "main", draft: str = "false") -> dict:
 
         return {
             "status": "成功",
-            "conclusion": f"PR 已创建: {output}",
             "summary": f"PR: {title} => {output}",
             "detail": output,
         }
@@ -127,21 +121,18 @@ def create_pr(data: str, base: str = "main", draft: str = "false") -> dict:
         err = e.output.strip() if e.output else str(e)
         return {
             "status": "失败",
-            "conclusion": f"gh pr create 执行出错: {err}",
-            "summary": "",
+            "summary": f"gh pr create 执行出错: {err}",
             "detail": err,
         }
     except FileNotFoundError:
         return {
             "status": "失败",
-            "conclusion": "未找到 gh CLI，请安装 GitHub CLI 并执行 gh auth login 进行认证。",
-            "summary": "",
+            "summary": "未找到 gh CLI，请安装 GitHub CLI 并执行 gh auth login 进行认证。",
             "detail": "",
         }
     except Exception as e:
         return {
             "status": "失败",
-            "conclusion": f"创建 PR 过程异常: {str(e)}",
-            "summary": "",
+            "summary": f"创建 PR 过程异常: {str(e)}",
             "detail": "",
         }

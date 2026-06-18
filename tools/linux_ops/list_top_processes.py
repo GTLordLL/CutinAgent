@@ -29,7 +29,7 @@ def list_top_processes(sort_by="cpu", limit=5):
 
         # 专家分析结论
         if not top_list:
-            return "失败 | 无法获取进程信息"
+            return {"status": "失败", "summary": "无法获取进程信息", "detail": ""}
 
         # 识别"首犯"
         leader = top_list[0]
@@ -44,13 +44,13 @@ def list_top_processes(sort_by="cpu", limit=5):
             for p in top_list
         ]
 
-        summary = f"发现异常高耗能进程 '{leader['name']}'(PID: {leader['pid']})，请重点排查。" if is_anomaly else "各进程资源占用处于正常区间。"
+        anomaly_summary = f"发现异常高耗能进程 '{leader['name']}'(PID: {leader['pid']})，请重点排查。" if is_anomaly else "各进程资源占用处于正常区间。"
 
-        return (
-            f"成功 | [进程专项诊断-{sort_by.upper()}] {summary}\n"
-            f"[DETAIL]\n"
-            f"Top {limit} 列表：\n" + "\n".join(detail_lines)
-        )
+        return {
+            "status": "成功",
+            "summary": f"[进程专项诊断-{sort_by.upper()}] {anomaly_summary}",
+            "detail": f"Top {limit} 列表：\n" + "\n".join(detail_lines),
+        }
 
     except Exception as e:
-        return f"失败 | 进程分析崩溃: {str(e)}"
+        return {"status": "失败", "summary": f"进程分析崩溃: {str(e)}", "detail": ""}

@@ -94,7 +94,6 @@ def run_test():
             "execution_result": "",
 
             "tool_status": "",
-            "tool_conclusion": "",
             "tool_summary": "",
             "tool_detail_var": "",
 
@@ -137,12 +136,9 @@ def run_test():
 
                 elif "tool_executor" in node_name:
                     ts = output.get("tool_status", "")
-                    tc = output.get("tool_conclusion", "")
                     tsm = output.get("tool_summary", "")
                     tdv = output.get("tool_detail_var", "")
-                    print(f"[工具执行] {ts} | {tc}")
-                    if tsm:
-                        print(f"  摘要: {tsm}")
+                    print(f"[工具执行] {ts} | {tsm}")
                     if tdv:
                         print(f"  变量: {tdv}")
 

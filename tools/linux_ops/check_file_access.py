@@ -10,7 +10,7 @@ def check_file_access(path: str):
     try:
         # 1. 基础存在性检查
         if not os.path.exists(path):
-            return f"失败 | 路径 {path} 不存在，无法检查权限。"
+            return {"status": "失败", "summary": f"路径 {path} 不存在，无法检查权限。", "detail": ""}
 
         # 2. 获取文件详细属性
         file_stat = os.stat(path)
@@ -37,25 +37,23 @@ def check_file_access(path: str):
         if writable: access_summary.append("可写")
         if executable: access_summary.append("可执行" if not is_dir else "可进入")
 
-        # 5. 生成专家结论
-        status_prefix = "成功 | [权限诊断]"
+        # 5. 生成返回 dict
         identity_info = f"当前 Agent 身份: {current_user} (所属组: {', '.join(current_groups)})"
         file_info = f"目标 {'目录' if is_dir else '文件'} 所有者: {owner_name}:{group_name}, 权限位: {oct_perms}"
-        
+
         # 核心定性结论
         if not readable:
-            conclusion = f"由于当前用户 {current_user} 不在 {owner_name} 的权限范围内且没有读权限，导致访问受限。请考虑使用 sudo 或修改文件归属。"
+            diagnosis = f"由于当前用户 {current_user} 不在 {owner_name} 的权限范围内且没有读权限，导致访问受限。请考虑使用 sudo 或修改文件归属。"
         elif not writable and "写" in access_summary:
-            conclusion = "虽然有读权限，但缺乏写权限，无法修改文件。"
+            diagnosis = "虽然有读权限，但缺乏写权限，无法修改文件。"
         else:
-            conclusion = f"当前权限状态为 ({', '.join(access_summary)})，状态符合预期。"
+            diagnosis = f"当前权限状态为 ({', '.join(access_summary)})，状态符合预期。"
 
-        return (
-            f"{status_prefix} 结论: {conclusion}\n"
-            f"[DETAIL]\n"
-            f"详情: {file_info}\n"
-            f"环境: {identity_info}"
-        )
+        return {
+            "status": "成功",
+            "summary": f"[权限诊断] 结论: {diagnosis}",
+            "detail": f"详情: {file_info}\n环境: {identity_info}",
+        }
 
     except Exception as e:
-        return f"失败 | 权限诊断过程崩溃: {str(e)}"
+        return {"status": "失败", "summary": f"权限诊断过程崩溃: {str(e)}", "detail": ""}

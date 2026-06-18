@@ -87,17 +87,16 @@ def get_git_branches(remote: str = "false") -> dict:
 
         return {
             "status": "成功",
-            "conclusion": f"当前分支 '{head_branch}'，{len(local_branches)} 个本地分支",
-            "summary": "，".join(summary_parts),
+            "summary": f"当前分支 '{head_branch}'，{len(local_branches)} 个本地分支",
             "detail": detail,
         }
 
     except subprocess.CalledProcessError as e:
-        return {"status": "失败", "conclusion": f"git branch 执行出错: {e.output.strip()}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"git branch 执行出错: {e.output.strip()}", "detail": ""}
     except FileNotFoundError:
-        return {"status": "失败", "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未找到 git 命令，请确认当前目录是 git 仓库。", "detail": ""}
     except Exception as e:
-        return {"status": "失败", "conclusion": f"获取分支列表异常: {str(e)}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"获取分支列表异常: {str(e)}", "detail": ""}
 
 
 def _get_branches_for_each_ref(ref_pattern: str) -> list[dict]:

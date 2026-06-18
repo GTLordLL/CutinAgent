@@ -9,12 +9,12 @@ def git_delete_branch(names: str, force: str = "false") -> dict:
         force: 是否强制删除，"true" 使用 git branch -D，"false"(默认) 使用 git branch -d。
     """
     if not names or not names.strip():
-        return {"status": "失败", "conclusion": "未指定要删除的分支名称。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未指定要删除的分支名称。", "detail": ""}
 
     # 支持逗号和空格分隔
     branch_list = [n.strip() for n in names.replace(',', ' ').split() if n.strip()]
     if not branch_list:
-        return {"status": "失败", "conclusion": "未提取到有效的分支名称。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未提取到有效的分支名称。", "detail": ""}
 
     # 获取当前分支名，防止误删
     try:
@@ -23,16 +23,15 @@ def git_delete_branch(names: str, force: str = "false") -> dict:
             stderr=subprocess.STDOUT, universal_newlines=True
         ).strip()
     except subprocess.CalledProcessError as e:
-        return {"status": "失败", "conclusion": f"无法获取当前分支: {e.output.strip()}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"无法获取当前分支: {e.output.strip()}", "detail": ""}
     except FileNotFoundError:
-        return {"status": "失败", "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未找到 git 命令，请确认当前目录是 git 仓库。", "detail": ""}
 
     # 检查是否包含当前分支
     if current_branch in branch_list:
         return {
             "status": "失败",
-            "conclusion": f"不能删除当前所在分支 '{current_branch}'。请先切换到其他分支后再试。",
-            "summary": "",
+            "summary": f"不能删除当前所在分支 '{current_branch}'。请先切换到其他分支后再试。",
             "detail": f"当前分支: {current_branch}\n尝试删除: {', '.join(branch_list)}",
         }
 
@@ -63,13 +62,12 @@ def git_delete_branch(names: str, force: str = "false") -> dict:
     if failed:
         parts.append(f"{len(failed)} 个失败: {'; '.join(failed)}")
 
-    conclusion = "。".join(parts) if parts else "无操作"
+    summary_text = "。".join(parts) if parts else "无操作"
     success = len(deleted) > 0 and len(failed) == 0
 
     return {
         "status": "成功" if success or (deleted and not failed) else "失败",
-        "conclusion": conclusion,
-        "summary": f"删除 {len(deleted)}/{len(branch_list)} 个分支",
+        "summary": summary_text,
         "detail": "\n".join(
             [f"[OK] {d}" for d in deleted] +
             [f"[FAIL] {f}" for f in failed]

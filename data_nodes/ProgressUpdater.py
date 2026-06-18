@@ -1,6 +1,6 @@
 """进度更新器 —— 纯 Python 代码替代 ProgressSummarizerV2。
 
-接收 ToolExecutor 的执行结果（四字段），以机械方式更新 SOP_PLAN 中的进度标记。
+接收 ToolExecutor 的执行结果（三字段），以机械方式更新 SOP_PLAN 中的进度标记。
 不调用 LLM，不总结执行结果。
 """
 
@@ -42,15 +42,12 @@ def _fill_skipped_gaps(steps: list[dict], from_num: int, to_num: int):
 
 # ── result formatting ────────────────────────────────────
 
-def _format_result(status: str, conclusion: str, summary: str,
+def _format_result(status: str, summary: str,
                    detail_var: str) -> str:
-    """根据四字段拼接执行结果字符串。"""
+    """根据三字段拼接执行结果字符串。"""
     if status == "失败":
-        return f"{status} | {conclusion}"
-    parts = [status, conclusion]
-    if summary:
-        parts.append(summary)
-    result = " | ".join(parts)
+        return f"{status} | {summary}"
+    result = f"{status} | {summary}"
     if detail_var:
         result += f" [变量: {detail_var}]"
     return result
@@ -74,20 +71,18 @@ def _already_has_result(step: dict) -> bool:
 # ── update handlers ──────────────────────────────────────
 
 def _update_sequential(step: dict, tool_call_raw: str,
-                       status: str, conclusion: str,
-                       summary: str, detail_var: str):
-    """顺序/并行步骤：拼接四字段到步骤标题。"""
-    formatted = _format_result(status, conclusion, summary, detail_var)
+                       status: str, summary: str, detail_var: str):
+    """顺序/并行步骤：拼接三字段到步骤标题。"""
+    formatted = _format_result(status, summary, detail_var)
     base = re.sub(r'\s*已跳过.*$', '', step['header'])
     step['header'] = f"{base} 结果: {formatted}。"
     step['sub_lines'] = []
 
 
 def _update_conditional(step: dict, tool_call_raw: str,
-                        status: str, conclusion: str,
-                        summary: str, detail_var: str):
+                        status: str, summary: str, detail_var: str):
     """条件步骤：匹配分支，输出 '因为...所以...' """
-    formatted = _format_result(status, conclusion, summary, detail_var)
+    formatted = _format_result(status, summary, detail_var)
     base = re.sub(r'\s*已跳过.*$', '', step['header'])
     branches = re.findall(r'如果(.+?)，就\s*调用\s*(\w+)\(', base)
 
@@ -114,11 +109,10 @@ def _update_interrupt(step: dict):
 
 
 def _update_with_retry(step: dict, tool_call_raw: str,
-                       status: str, conclusion: str,
-                       summary: str, detail_var: str,
+                       status: str, summary: str, detail_var: str,
                        retry_limit: int):
     """重新执行时的重试标记：追加重试计数或上限标记。"""
-    formatted = _format_result(status, conclusion, summary, detail_var)
+    formatted = _format_result(status, summary, detail_var)
     current_retry = _extract_retry_count(step)
     next_retry = current_retry + 1
 
@@ -176,8 +170,7 @@ def progress_updater_node(state: dict) -> dict:
         last_step: SOP Execution Scheduler 输出的 NEXT_STEP
         current_tool_call_raw: 刚被 ToolExecutor 执行过的工具调用字符串
         tool_status: "成功" / "失败"
-        tool_conclusion: 结论/原因
-        tool_summary: 精简数据
+        tool_summary: 精简结论/摘要
         tool_detail_var: 变量名 VAR_xxx（可为空）
         retry_limit: SOP 全局重试上限
         current_round: 当前回合数
@@ -191,7 +184,6 @@ def progress_updater_node(state: dict) -> dict:
     last_step = state.get("last_step", "")
     tool_call_raw = state.get("current_tool_call_raw", "")
     status = state.get("tool_status", "")
-    conclusion = state.get("tool_conclusion", "")
     summary = state.get("tool_summary", "")
     detail_var = state.get("tool_detail_var", "")
     retry_limit = state.get("retry_limit", 3)
@@ -233,14 +225,14 @@ def progress_updater_node(state: dict) -> dict:
 
     if is_retry:
         _update_with_retry(target, tool_call_raw,
-                           status, conclusion, summary, detail_var,
+                           status, summary, detail_var,
                            retry_limit)
     elif step_type in (StepType.SEQUENTIAL, StepType.PARALLEL):
         _update_sequential(target, tool_call_raw,
-                           status, conclusion, summary, detail_var)
+                           status, summary, detail_var)
     elif step_type == StepType.CONDITIONAL:
         _update_conditional(target, tool_call_raw,
-                            status, conclusion, summary, detail_var)
+                            status, summary, detail_var)
     elif step_type == StepType.INTERRUPT:
         _update_interrupt(target)
     # FINISH / ERROR: 不处理
