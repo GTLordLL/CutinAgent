@@ -22,14 +22,17 @@ Read USER_MESSAGE against the known information from step 1. Identify what is cl
 
 Based on this analysis, self-assess your CONFIDENCE:
 
-- **high**: The user's request is unambiguous and you have sufficient facts to understand their core intent. No further information gathering is needed.
-- **medium**: You understand the general direction but the user's intent could have multiple interpretations, or key facts are still missing.
-- **low**: The user's input is too vague, or critical information is missing, or the problem lies outside what observable tools can reveal.
+- **high**: The user's request is unambiguous and you clearly understand their core intent.
+- **medium**: You understand the general direction but the user's intent could have multiple interpretations, or key contextual facts are still missing.
+- **low**: The user's input is too vague, or the problem lies outside what observable tools can reveal.
 
-### 3. Select Tools (when CONFIDENCE is not high)
-If CONFIDENCE is **high**, skip this step and jump directly to step 5.
+### 3. Select Tools
+Based on the information gaps identified in step 2, decide:
 
-If CONFIDENCE is **medium** or **low**, scan GATHERED_TOOLS and select the most relevant tools to fill the information gaps identified in step 2:
+- **Information gaps exist** → scan GATHERED_TOOLS and select the most relevant tools to fill those gaps.
+- **No information gaps** (purely conversational chat, knowledge问答, or all relevant facts already in CURRENT_DIALOGUE / EXECUTION_HISTORY) → jump to step 5, no tools needed.
+
+When selecting tools:
 - Prefer tools that cover multiple information dimensions at once, rather than calling individual checkers one by one.
 - Select independent tools for parallel execution (separated by ` | `) to maximize information gathered per round.
 - Choose tools whose output directly addresses the specific gaps identified in step 2.

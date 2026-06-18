@@ -260,11 +260,12 @@ async def _execute_analyzer_tool_calls(
             f"({', '.join(f'{k}={v}' for k, v in args.items())})[/dim]"
         )
         result = ctx.tool_dispatcher.dispatch(tool_id, args)
+        detail_val = result.get('detail') or result.get('conclusion', '')
         exec_entry = (
             f"[Analyzer Round {round_num}] "
             f"{tool_id}({', '.join(f'{k}={v}' for k, v in args.items())}): "
             f"status=\"{result.get('status', '?')}\", "
-            f"detail=\"{result.get('detail', result.get('conclusion', ''))[:500]}\""
+            f"detail=\"{detail_val[:500]}\""
         )
         current_exec = ctx.state.get("execution_history", "")
         ctx.state["execution_history"] = (
@@ -298,8 +299,9 @@ async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
     """运行问题分析员多轮信息收集循环。
 
     仅在 analyzer_enabled 配置开启时执行。
-    最多运行 analyzer_max_rounds 轮，高置信度时提前退出。
-    分析结果追加到 current_dialogue 供 UserCoordinator 参考。
+    循环由 TOOL_CALL 驱动：LLM 返回工具调用则执行后继续，
+    返回 None 则退出。CONFIDENCE 仅作为元数据传递给 UserCoordinator。
+    最多运行 analyzer_max_rounds 轮。
     """
     from repl.state.config_manager import get_config
     from repl.execution.llm_runner import run_llm_node
@@ -331,18 +333,18 @@ async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
             f"当前状态: {ctx.state.get('analyzer_current_state', '')[:80]}...[/dim]"
         )
 
-        # 高置信度 → 提前退出
-        if confidence == "high":
-            my_understanding = ctx.state.get("analyzer_my_understanding", "")
-            ctx.console.print(
-                f"[dim][ProblemAnalyzer] 高置信度，推断意图: "
-                f"{my_understanding[:100]}[/dim]"
-            )
-            break
-
         tool_call = ctx.state.get("analyzer_tool_call", "")
         if not tool_call or tool_call.strip().upper() == "NONE":
-            ctx.console.print("[dim][ProblemAnalyzer] 无工具调用，退出分析循环。[/dim]")
+            if confidence == "high":
+                my_understanding = ctx.state.get("analyzer_my_understanding", "")
+                ctx.console.print(
+                    f"[dim][ProblemAnalyzer] 无工具调用 + 高置信度，"
+                    f"推断意图: {my_understanding[:100]}[/dim]"
+                )
+            else:
+                ctx.console.print(
+                    "[dim][ProblemAnalyzer] 无工具调用，退出分析循环。[/dim]"
+                )
             break
 
         await _execute_analyzer_tool_calls(ctx, tool_call, analyzer_rounds + 1)

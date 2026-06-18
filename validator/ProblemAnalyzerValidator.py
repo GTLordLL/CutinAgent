@@ -5,7 +5,7 @@
 校验规则：
 - CURRENT_STATE: 非空，非 None
 - CONFIDENCE: 必须为 high / medium / low
-- TOOL_CALL: confidence=high 时必须为 None；否则可以为调用或 None
+- TOOL_CALL: 无限制，与 CONFIDENCE 独立；可为工具调用字符串或 None
 - MY_UNDERSTANDING: confidence=high 时必须为非 None 文本；否则必须为 None
 """
 
@@ -44,9 +44,7 @@ def validate_analyzer_output(raw_output: str) -> tuple:
     understanding_is_none = (not my_understanding or my_understanding.strip().upper() == "NONE")
 
     if confidence == "high":
-        # high: TOOL_CALL 必须为 None，MY_UNDERSTANDING 必须非 None
-        if not tool_is_none:
-            return False, f"CONFIDENCE=high 时 TOOL_CALL 必须为 None，实际为: '{tool_call}'", fields
+        # high: MY_UNDERSTANDING 必须非 None（TOOL_CALL 无限制，与 CONFIDENCE 独立）
         if understanding_is_none:
             return False, "CONFIDENCE=high 时 MY_UNDERSTANDING 不能为空或 NONE", fields
     else:

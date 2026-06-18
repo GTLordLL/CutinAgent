@@ -40,7 +40,7 @@ TOOL_CALL: get_system_health() | list_top_processes(count=5)
 MY_UNDERSTANDING: None
 ```
 
-Example 3 — High confidence, no tools needed:
+Example 3 — No tools needed:
 ```
 CURRENT_STATE: 分支 feature/login，3个文件变更：新增 login.py(+45行)、更新 config.py(+3行)、删除 old_auth.py(-120行)。工作区干净，无冲突。关键信息已充分。
 CONFIDENCE: high
