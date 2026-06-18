@@ -25,7 +25,7 @@ BLACKLIST_PATTERNS = [
 ]
 
 # ═══════════════════════════════════════════════════════════
-# 第二层：二进制白名单 (~55 个只读命令)
+# 第二层：二进制白名单 (~54 个只读命令)
 # ═══════════════════════════════════════════════════════════
 WHITELIST_BINARIES = {
     # 文件查看
@@ -48,14 +48,14 @@ WHITELIST_BINARIES = {
     'dmesg', 'journalctl', 'last', 'lastb', 'w',
     # 服务 (仅 systemctl 只读子命令，危险子命令由第一层 >/; 覆盖)
     'systemctl',
-    # 版本控制 (仅 git 只读子命令)
+    # 版本控制 (仅 git 只读子命令，写子命令由 GIT_RO_SUBCMDS + GIT_WRITE_SUBCMD_BLOCKED 拦截)
     'git',
     # Web 请求 (curl/wget 禁止 -o/-O 由额外检查处理)
     'curl', 'wget',
     # 包信息
     'dpkg-query', 'rpm',
     # 工具
-    'which', 'whereis', 'echo', 'printf', 'env', 'xargs',
+    'which', 'whereis', 'echo', 'printf', 'env',
     # 校验
     'md5sum', 'sha1sum', 'sha256sum', 'sha512sum',
     # 归档 (tar 仅 -t 列出)
@@ -68,11 +68,30 @@ SYSTEMCTL_RO_SUBCMDS = {
     'show', 'cat', 'list-dependencies', 'list-sockets', 'list-timers',
 }
 
+# git 只读子命令白名单（严禁 add/commit/push/reset/rebase/merge 等写操作）
+GIT_RO_SUBCMDS = {
+    'status', 'log', 'diff', 'show', 'rev-parse', 'rev-list', 'ls-files',
+    'ls-tree', 'blame', 'describe', 'shortlog', 'cherry', 'merge-base',
+    'for-each-ref', 'name-rev', 'whatchanged', 'count-objects',
+    'help', 'version', '--version', '--help', '-h', '-c',
+}
+
 # curl/wget 禁止的写输出选项
 CURL_WGET_BLOCKED = re.compile(r'\b(?:curl|wget)\b.*\s(?:-[oO]\s*\S|--output\s)', re.DOTALL)
 
 # tar 禁止的非列出模式
 TAR_BLOCKED = re.compile(r'\btar\b.*\s-(?:[A-Za-z]*[xcrRXu]|-[A-Za-z]*delete)', re.DOTALL)
+
+# sed 禁止 -i 原地修改（写文件旁路）
+SED_INPLACE_BLOCKED = re.compile(r'\bsed\b.*\s-[A-Za-z]*i', re.DOTALL)
+
+# git 禁止的写子命令（双层保险，万一 GIT_RO_SUBCMDS 未覆盖）
+GIT_WRITE_SUBCMD_BLOCKED = re.compile(
+    r'\bgit\b\s+(add|commit|push|reset|rebase|merge|fetch|pull|'
+    r'cherry-pick|revert|clean|gc|prune|reflog|stash|rm|mv|'
+    r'checkout|switch|restore|bisect|worktree|submodule|subtree)\b',
+    re.DOTALL,
+)
 
 
 def _extract_binaries(command: str) -> list:
@@ -165,6 +184,48 @@ def run_command(command: str) -> dict:
             return {
                 "status": "失败",
                 "summary": "安全拦截: tar 仅允许 -t (列出) 模式，禁止解包/创建/删除",
+                "detail": "",
+            }
+
+    # git 写子命令二层拦截（正则，在子命令白名单之前执行）
+    if 'git' in binaries:
+        if GIT_WRITE_SUBCMD_BLOCKED.search(cmd):
+            return {
+                "status": "失败",
+                "summary": "安全拦截: git 写操作 (add/commit/push/reset/...) 被禁止，仅限只读子命令",
+                "detail": "",
+            }
+
+    # git 只读子命令白名单检查（与 systemctl 同理）
+    if 'git' in binaries:
+        tokens = shlex.split(cmd) if _safe_shlex(cmd) else cmd.split()
+        for i, tok in enumerate(tokens):
+            if tok == 'git' and i + 1 < len(tokens):
+                subcmd = tokens[i + 1]
+                # 跳过 -c name=value 这类配置前缀
+                if subcmd == '-c' and i + 3 < len(tokens):
+                    subcmd = tokens[i + 3]
+                if subcmd.startswith('-'):
+                    # --version, --help, -h 等选项
+                    if subcmd not in GIT_RO_SUBCMDS:
+                        return {
+                            "status": "失败",
+                            "summary": f"安全拦截: git 选项 '{subcmd}' 不允许",
+                            "detail": "",
+                        }
+                elif subcmd not in GIT_RO_SUBCMDS:
+                    return {
+                        "status": "失败",
+                        "summary": f"安全拦截: git 子命令 '{subcmd}' 不允许，仅限只读子命令",
+                        "detail": "",
+                    }
+
+    # sed -i 原地修改检查
+    if 'sed' in binaries:
+        if SED_INPLACE_BLOCKED.search(cmd):
+            return {
+                "status": "失败",
+                "summary": "安全拦截: sed -i 原地修改文件被禁止",
                 "detail": "",
             }
 
