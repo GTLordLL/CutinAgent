@@ -20,7 +20,7 @@ def git_push(branch: str = "", remote: str = "origin", set_upstream: str = "fals
             ).strip()
 
         if not branch:
-            return {"status": "失败", "conclusion": "当前处于 detached HEAD 状态，无法推送。", "summary": "", "detail": ""}
+            return {"status": "失败", "summary": "当前处于 detached HEAD 状态，无法推送。", "detail": ""}
 
         # ── 2. 检查 remote 是否存在 ──
         try:
@@ -31,12 +31,11 @@ def git_push(branch: str = "", remote: str = "origin", set_upstream: str = "fals
             if remote not in remotes.split('\n'):
                 return {
                     "status": "失败",
-                    "conclusion": f"远程 '{remote}' 不存在。可用远程: {remotes}",
-                    "summary": "",
+                    "summary": f"远程 '{remote}' 不存在。可用远程: {remotes}",
                     "detail": "",
                 }
         except subprocess.CalledProcessError:
-            return {"status": "失败", "conclusion": "未配置任何远程仓库。", "summary": "", "detail": ""}
+            return {"status": "失败", "summary": "未配置任何远程仓库。", "detail": ""}
 
         # ── 3. 构建 push 命令 ──
         cmd = ["git", "push"]
@@ -60,7 +59,6 @@ def git_push(branch: str = "", remote: str = "origin", set_upstream: str = "fals
 
         return {
             "status": "成功",
-            "conclusion": f"分支 '{branch}' 已推送到 {remote}",
             "summary": summary,
             "detail": output_stripped,
         }
@@ -74,11 +72,10 @@ def git_push(branch: str = "", remote: str = "origin", set_upstream: str = "fals
             hint = "（提示：使用 set_upstream=true 设置上游跟踪）"
         return {
             "status": "失败",
-            "conclusion": f"推送失败: {err}{hint}",
-            "summary": "",
+            "summary": f"推送失败: {err}{hint}",
             "detail": err,
         }
     except FileNotFoundError:
-        return {"status": "失败", "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未找到 git 命令，请确认当前目录是 git 仓库。", "detail": ""}
     except Exception as e:
-        return {"status": "失败", "conclusion": f"推送过程异常: {str(e)}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"推送过程异常: {str(e)}", "detail": ""}

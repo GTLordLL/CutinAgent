@@ -12,8 +12,7 @@ def git_commit(message: str, files: str = ".") -> dict:
         if not status_output.strip():
             return {
                 "status": "失败",
-                "conclusion": "工作区干净，没有需要提交的变更。",
-                "summary": "",
+                "summary": "工作区干净，没有需要提交的变更。",
                 "detail": "",
             }
 
@@ -52,19 +51,17 @@ def git_commit(message: str, files: str = ".") -> dict:
 
         return {
             "status": "成功",
-            "conclusion": f"提交成功 (hash: {commit_hash})",
-            "summary": summary,
+            "summary": f"提交成功 (hash: {commit_hash})",
             "detail": "",
         }
 
     except subprocess.CalledProcessError as e:
         return {
             "status": "失败",
-            "conclusion": f"git commit 执行失败: {e.output.strip()}。提示: 如需回滚，可执行 git reset --soft HEAD~1。",
-            "summary": "",
+            "summary": f"git commit 执行失败: {e.output.strip()}。提示: 如需回滚，可执行 git reset --soft HEAD~1。",
             "detail": "",
         }
     except FileNotFoundError:
-        return {"status": "失败", "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未找到 git 命令，请确认当前目录是 git 仓库。", "detail": ""}
     except Exception as e:
-        return {"status": "失败", "conclusion": f"提交过程异常: {str(e)}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"提交过程异常: {str(e)}", "detail": ""}

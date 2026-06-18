@@ -24,7 +24,7 @@ SOP 即代码。Plan_Steps 使用自然语言表达任务逻辑，同时受严�
 ### 2.1 行格式
 每行必须以 `序号. ` 开头（数字 + 句点 + 至少一个空格）。示例：
 ```
-1. 调用 locate_large_files(path=/var/log, limit=5)
+1. 调用 run_command(command='du -ahx /var/log 2>/dev/null | sort -rh | head -n 10')
 2. FINISH。
 ```
 
@@ -56,7 +56,7 @@ SopSpecChecker 按优先级从高到低分类每个步骤：
 
 | 子类型 | 句式 | 示例 |
 |--------|------|------|
-| 静态并行 | `同时调用 A(...) 和 B(...)` | `1. 同时调用 get_system_health(target='all') 和 check_system_sync()` |
+| 静态并行 | `同时调用 A(...) 和 B(...)` | `1. 同时调用 get_system_health(target='all') 和 get_system_health(target='time')` |
 | 动态集合并行 | `基于步骤X的{集合}，同时为其中每一个调用 tool(...)` | `2. 基于步骤1的大文件列表，同时为其中每一个大文件调用 check_file_access(path=该文件的完整路径)` |
 
 约束：

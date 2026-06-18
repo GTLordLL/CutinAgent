@@ -276,8 +276,9 @@ def handle_command(cmd: str) -> tuple[bool, str | None]:
         msg = "\n".join([
             "**可用 SOP 列表**",
             "",
-            "- `GIT_SMART_COMMIT` — 智能生成 git commit 信息",
-            "- `GIT_DAILY_SUMMARY` — 生成当日工作总结",
+            "- `GIT_SMART_COMMIT` — 智能生成 git commit 信息并提交",
+            "- `GIT_BRANCH_CLEANUP` — 清理过期的已合并分支",
+            "- `GIT_PR_CREATE` — 生成 PR 描述并创建 GitHub Pull Request",
         ])
         return True, msg
     if cmd == "/history":

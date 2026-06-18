@@ -1,119 +1,55 @@
-import time
+"""ChatCompactor LLM 节点。
+
+对对话上下文进行压缩，由 /compact 命令或 auto-compact 触发。
+Thinker (temp 0.4) + Formatter (temp 0.0) 双阶段，输出 CONVERSATION_SUMMARY 单字段。
+"""
+
 from rich.console import Console
-from validator.ChatCompactorValidator import validate_chat_compactor_output
-from utils.debug_logger import log_node_io
-from utils.streaming import stream_llm
 from repl.dialogue_utils import dialogue_to_text
-from repl.config_manager import get_config
+from llm_nodes.thinker_formatter_runner import run_thinker_formatter
 
 
 def chat_compactor_node(resources):
-    """ChatCompactor 可调用对象工厂。
+    """ChatCompactor 可调用对象工厂。"""
 
-    返回一个函数，接收 state dict，执行 Thinker+Formatter 双阶段推理，
-    对对话上下文进行压缩，返回 state 更新 dict。
-
-    触发时机：
-    - /compact 命令手动触发
-    - thinker_input_tokens > 4096 自动触发
-
-    不注册为 LangGraph 节点 —— 由 main.py REPL 循环直接调用。
-    """
-    thinker_llm = resources.get_llm("chat_compactor_thinker")
-    formatter_llm = resources.get_llm("all_formatter")
-    thinker_prompt = resources.prompts["chat_compactor_thinker"]
-    formatter_prompt = resources.prompts["chat_compactor_formatter"]
     _console = Console()
 
     def compact_chat(state: dict) -> dict:
-        cfg = get_config()
-        buf_interval = float(cfg["stream_buffer_interval"])
-        t_start = time.time()
-        round_num = state.get("current_round", 0)
-
-        compact_requirement = state.get("chat_compact_requirement", "")
         user_message = state.get("user_instruction", "")
         current_dialogue = state.get("current_dialogue", [])
         conversation_history = state.get("conversation_history", "")
+        compact_requirement = state.get("chat_compact_requirement", "")
 
-        # --- Thinker ---
-        thinker_input = (
-            f"COMPACT_REQUIREMENT: {compact_requirement or 'None'}\n\n"
-            f"USER_MESSAGE: {user_message}\n\n"
-            f"CURRENT_DIALOGUE: {dialogue_to_text(current_dialogue) or 'None'}\n\n"
-            f"CONVERSATION_HISTORY: {conversation_history or 'None'}\n"
-        )
-        thinker_raw = (
-            f"<|im_start|>system\n{thinker_prompt}<|im_end|>\n"
-            f"<|im_start|>user\n{thinker_input}<|im_end|>\n"
-            f"<|im_start|>assistant\n"
-        )
-
-        _console.out("  [Thinker] ", style="dim")
-        reasoning_chain, thinker_tokens = stream_llm(thinker_llm, thinker_raw, buffer_interval=buf_interval, console=_console, style="dim")
-
-        # --- Formatter with retries ---
-        max_retries = 3
-        retries = 0
-        formatter_logs = []
-        formatter_tokens_list = []
-        parsed = {}
-
-        formatter_base = (
-            f"<|im_start|>system\n{formatter_prompt}<|im_end|>\n"
-            f"<|im_start|>user\nTHINKING_PROCESS:\n{reasoning_chain}\n<|im_end|>\n"
-            f"<|im_start|>assistant\n"
-        )
-        current_prompt = formatter_base
-
-        while retries < max_retries:
-            retry_label = " (retry)" if retries > 0 else ""
-            _console.out(f"\n  [Formatter{retry_label}] ", style="dim")
-            raw_output, fmt_tokens = stream_llm(formatter_llm, current_prompt, buffer_interval=buf_interval, console=_console, style="dim")
-            if fmt_tokens:
-                formatter_tokens_list.append(fmt_tokens)
-
-            is_valid, error_reason, p = validate_chat_compactor_output(raw_output)
-            formatter_logs.append({
-                "retry": retries,
-                "output": raw_output,
-                "valid": is_valid,
-                "reason": error_reason if not is_valid else ""
-            })
-
-            if is_valid:
-                parsed = p
-                break
-
-            retries += 1
-            current_prompt += (
-                f"{raw_output}<|im_end|>\n"
-                f"<|im_start|>user\n格式输出错误，原因：{error_reason}<|im_end|>\n"
-                f"<|im_start|>assistant\n"
+        def build_input(s):
+            return (
+                f"COMPACT_REQUIREMENT: {compact_requirement or 'None'}\n\n"
+                f"USER_MESSAGE: {user_message}\n\n"
+                f"CURRENT_DIALOGUE: {dialogue_to_text(current_dialogue) or 'None'}\n\n"
+                f"CONVERSATION_HISTORY: {conversation_history or 'None'}\n"
             )
 
-        # --- Fallback if all retries exhausted ---
-        if not parsed:
-            parsed = {
-                "conversation_summary": "User conversation occurred but could not be summarized.",
+        from validator.ChatCompactorValidator import validate_chat_compactor_output
+
+        def map_result(parsed, thinker_tokens, **ctx):
+            return {
+                "chat_conversation_summary": parsed.get("conversation_summary", ""),
             }
 
-        result = {
-            "chat_conversation_summary": parsed.get("conversation_summary", ""),
-        }
-
-        log_node_io(
+        return run_thinker_formatter(
+            state=state,
+            resources=resources,
+            thinker_llm_key="chat_compactor_thinker",
+            formatter_llm_key="all_formatter",
+            thinker_prompt_key="chat_compactor_thinker",
+            formatter_prompt_key="chat_compactor_formatter",
             node_name="ChatCompactor",
-            round_num=round_num,
-            thinker_input=thinker_input,
-            reasoning_chain=reasoning_chain,
-            formatter_logs=formatter_logs,
-            final_result=result,
-            session_dir=state.get("session_dir", ""),
-            elapsed_seconds=time.time() - t_start,
-            token_usage={"thinker": thinker_tokens, "formatter": formatter_tokens_list},
+            build_thinker_input=build_input,
+            validate_output=validate_chat_compactor_output,
+            map_result=map_result,
+            fallback_result={
+                "conversation_summary": "User conversation occurred but could not be summarized.",
+            },
+            console=_console,
         )
-
-        return result
 
     return compact_chat

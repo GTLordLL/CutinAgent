@@ -23,10 +23,9 @@ class OverallState(TypedDict):
     current_tool_calls: list   # 并行调用列表: [{tool_id, args}, ...]
     execution_result: str
 
-    # === 工具执行结果四字段 ===
+    # === 工具执行结果三字段 ===
     tool_status: str            # "成功" / "失败"
-    tool_conclusion: str        # 结论/原因
-    tool_summary: str           # 精简数据
+    tool_summary: str           # 精简结论/摘要
     tool_detail_var: str        # 变量名 VAR_xxx，无 DETAIL 时为空
 
     # === 进度追踪 (SopExecutionScheduler 判定) ===

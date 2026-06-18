@@ -41,13 +41,12 @@ def get_git_diff(staged: str = "false", base: str = "") -> dict:
 
         if not diff_output.strip():
             if base:
-                conclusion = f"分支相对 {base} 无代码差异（已同步）。"
+                summary_text = f"分支相对 {base} 无代码差异（已同步）。"
             else:
-                conclusion = f"工作区无{scope}的变更。"
+                summary_text = f"工作区无{scope}的变更。"
             return {
                 "status": "成功",
-                "conclusion": conclusion,
-                "summary": "",
+                "summary": summary_text,
                 "detail": "",
             }
 
@@ -69,12 +68,11 @@ def get_git_diff(staged: str = "false", base: str = "") -> dict:
         else:
             summary = f"共 {line_count} 行差异，涉及 {file_count} 个文件"
 
-        conclusion = f"{file_count} 个文件有变更（{scope}）"
+        summary_text = f"{file_count} 个文件有变更（{scope}）"
 
         return {
             "status": "成功",
-            "conclusion": conclusion,
-            "summary": summary,
+            "summary": summary_text,
             "detail": detail,
         }
 
@@ -82,21 +80,18 @@ def get_git_diff(staged: str = "false", base: str = "") -> dict:
         err = e.output.strip() if e.output else str(e)
         return {
             "status": "失败",
-            "conclusion": f"git diff 执行出错: {err}",
-            "summary": "",
+            "summary": f"git diff 执行出错: {err}",
             "detail": "",
         }
     except FileNotFoundError:
         return {
             "status": "失败",
-            "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。",
-            "summary": "",
+            "summary": "未找到 git 命令，请确认当前目录是 git 仓库。",
             "detail": "",
         }
     except Exception as e:
         return {
             "status": "失败",
-            "conclusion": f"获取变更差异异常: {str(e)}",
-            "summary": "",
+            "summary": f"获取变更差异异常: {str(e)}",
             "detail": "",
         }

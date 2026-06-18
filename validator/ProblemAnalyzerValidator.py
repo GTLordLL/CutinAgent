@@ -5,8 +5,8 @@
 校验规则：
 - CURRENT_STATE: 非空，非 None
 - CONFIDENCE: 必须为 high / medium / low
-- TOOL_CALL: confidence=high 时必须为 None；否则可以为调用或 None
-- MY_UNDERSTANDING: confidence=high 时必须为非 None 文本；否则必须为 None
+- TOOL_CALL: 无限制，与 CONFIDENCE 独立；可为工具调用字符串或 None
+- MY_UNDERSTANDING: 无限制，与 CONFIDENCE 独立；可为任意文本或 None
 """
 
 from parsers.analyzer_output import parse_analyzer_output
@@ -39,20 +39,9 @@ def validate_analyzer_output(raw_output: str) -> tuple:
     if confidence not in ("high", "medium", "low"):
         return False, f"CONFIDENCE 必须为 'high'、'medium' 或 'low'，实际为: '{confidence}'", fields
 
-    # 3. 根据 CONFIDENCE 校验 TOOL_CALL 和 MY_UNDERSTANDING
+    # 3. TOOL_CALL 和 MY_UNDERSTANDING 均与 CONFIDENCE 独立，不做关联校验
     tool_is_none = (not tool_call or tool_call.strip().upper() == "NONE")
     understanding_is_none = (not my_understanding or my_understanding.strip().upper() == "NONE")
-
-    if confidence == "high":
-        # high: TOOL_CALL 必须为 None，MY_UNDERSTANDING 必须非 None
-        if not tool_is_none:
-            return False, f"CONFIDENCE=high 时 TOOL_CALL 必须为 None，实际为: '{tool_call}'", fields
-        if understanding_is_none:
-            return False, "CONFIDENCE=high 时 MY_UNDERSTANDING 不能为空或 NONE", fields
-    else:
-        # medium / low: MY_UNDERSTANDING 必须为 None
-        if not understanding_is_none:
-            return False, f"CONFIDENCE={confidence} 时 MY_UNDERSTANDING 必须为 None，实际为: '{my_understanding}'", fields
 
     return True, "", {
         "current_state": current_state,

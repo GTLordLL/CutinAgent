@@ -10,13 +10,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
 DEMO1_DIR = os.path.join(TMP_DIR, "demo_smart_commit")
-DEMO2_DIR = os.path.join(TMP_DIR, "demo_daily_summary")
-DEMO3_DIR = os.path.join(TMP_DIR, "demo_branch_cleanup")
-DEMO4_DIR = os.path.join(TMP_DIR, "demo_repo_health")
-DEMO5_DIR = os.path.join(TMP_DIR, "demo_release_notes")
-DEMO6_DIR = os.path.join(TMP_DIR, "demo_conflict_resolve")
+DEMO2_DIR = os.path.join(TMP_DIR, "demo_branch_cleanup")
 
-DEMO_DIRS = [DEMO1_DIR, DEMO2_DIR, DEMO3_DIR, DEMO4_DIR, DEMO5_DIR, DEMO6_DIR]
+DEMO_DIRS = [DEMO1_DIR, DEMO2_DIR]
 
 # ---------- ANSI 颜色 ----------
 C_BOLD = "\033[1m"

@@ -18,7 +18,6 @@ def _save_tool_output(fields: dict, session_dir: str, round_num: int,
 
     record = {
         "status": fields.get("status", ""),
-        "conclusion": fields.get("conclusion", ""),
         "summary": fields.get("summary", ""),
         "detail": fields.get("detail", ""),
     }
@@ -33,7 +32,7 @@ def _save_tool_output(fields: dict, session_dir: str, round_num: int,
 
 def _process_tool_result(fields: dict, session_dir: str, round_num: int,
                          tool_id: str, elapsed_ms: float = 0.0) -> dict:
-    """处理工具返回的四字段 dict，存储 detail 为变量，返回 state 更新字段。"""
+    """处理工具返回的三字段 dict，存储 detail 为变量，返回 state 更新字段。"""
     detail = fields.get("detail", "")
 
     var_name = ""
@@ -44,16 +43,12 @@ def _process_tool_result(fields: dict, session_dir: str, round_num: int,
 
     # 拼接 execution_result 字符串（向后兼容日志/显示）
     status = fields.get("status", "")
-    conclusion = fields.get("conclusion", "")
     summary = fields.get("summary", "")
-    execution_result = f"{status} | {conclusion}"
-    if summary:
-        execution_result += f" | {summary}"
+    execution_result = f"{status} | {summary}"
 
     return {
         "execution_result": execution_result,
         "tool_status": status,
-        "tool_conclusion": conclusion,
         "tool_summary": summary,
         "tool_detail_var": var_name,
     }
@@ -63,7 +58,7 @@ def tool_executor_node(state: dict) -> dict:
     """LangGraph 节点：接收 tool_call(s)，分发执行。
 
     支持单调用和并行多调用。
-    工具返回四字段 dict，detail 存入 VariableStore，完整输出保存到 history 文件。
+    工具返回三字段 dict，detail 存入 VariableStore，完整输出保存到 history 文件。
     """
     tool_calls = state.get("current_tool_calls", [])
     dispatcher = ToolDispatcher()
@@ -73,7 +68,6 @@ def tool_executor_node(state: dict) -> dict:
     if tool_calls:
         results = []
         all_status = []
-        all_conclusion = []
         all_summary = []
         all_detail_var = []
         for tc in tool_calls:
@@ -86,7 +80,6 @@ def tool_executor_node(state: dict) -> dict:
                                              elapsed_ms=dt_ms)
             results.append(processed["execution_result"])
             all_status.append(processed["tool_status"])
-            all_conclusion.append(processed["tool_conclusion"])
             all_summary.append(processed["tool_summary"])
             all_detail_var.append(processed["tool_detail_var"])
 
@@ -94,7 +87,6 @@ def tool_executor_node(state: dict) -> dict:
         return {
             "execution_result": aggregated,
             "tool_status": " | ".join(all_status),
-            "tool_conclusion": " | ".join(all_conclusion),
             "tool_summary": " | ".join(all_summary),
             "tool_detail_var": " | ".join(v for v in all_detail_var if v),
         }
@@ -107,8 +99,7 @@ def tool_executor_node(state: dict) -> dict:
         return {
             "execution_result": "用户已确认继续。",
             "tool_status": "成功",
-            "tool_conclusion": "中断已确认，继续执行后续步骤。",
-            "tool_summary": "",
+            "tool_summary": "中断已确认，继续执行后续步骤。",
             "tool_detail_var": "",
         }
 

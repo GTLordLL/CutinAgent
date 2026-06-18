@@ -233,9 +233,9 @@ CutinAgent 有两个 Compactor，分工管理 4B 模型的 8K 上下文窗口：
 
 ### 5.4 工具合约
 
-  所有工具返回四字段 dict：
-    {"status": "成功|失败", "conclusion": "结论/原因",
-     "summary": "精简摘要", "detail": "详细数据"}
+  所有工具返回三字段 dict：
+    {"status": "成功|失败",
+     "summary": "结论/原因", "detail": "详细数据"}
 
   detail 非空 → ToolExecutor 存入 VariableStore (VAR_{TOOL_ID})
   后续步骤通过 data=VAR_{TOOL_ID} 引用

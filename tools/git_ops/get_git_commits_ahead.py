@@ -15,7 +15,7 @@ def get_git_commits_ahead(remote: str = "origin") -> dict:
         ).strip()
 
         if not branch:
-            return {"status": "失败", "conclusion": "当前处于 detached HEAD 状态，无法确定分支。", "summary": "", "detail": ""}
+            return {"status": "失败", "summary": "当前处于 detached HEAD 状态，无法确定分支。", "detail": ""}
 
         # ── 2. 查找对比基线：upstream → remote/branch → remote/HEAD ──
         upstream = ""
@@ -57,7 +57,6 @@ def get_git_commits_ahead(remote: str = "origin") -> dict:
             if not base_ref:
                 return {
                     "status": "成功",
-                    "conclusion": f"分支 '{branch}' 未推送，且远程无 main/master 分支可对比",
                     "summary": f"分支: {branch}（未推送，无对比基线）",
                     "detail": f"当前分支: {branch}\n远程: {remote}\n对比基线: 无\n\n（分支未推送，且远程无默认分支可对比）",
                 }
@@ -133,14 +132,13 @@ def get_git_commits_ahead(remote: str = "origin") -> dict:
 
         return {
             "status": "成功",
-            "conclusion": f"分支 '{branch}' 领先 {upstream} 共 {ahead_count} 个提交",
             "summary": summary,
             "detail": "\n".join(detail_lines),
         }
 
     except subprocess.CalledProcessError as e:
-        return {"status": "失败", "conclusion": f"git log 执行出错: {e.output.strip()}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"git log 执行出错: {e.output.strip()}", "detail": ""}
     except FileNotFoundError:
-        return {"status": "失败", "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未找到 git 命令，请确认当前目录是 git 仓库。", "detail": ""}
     except Exception as e:
-        return {"status": "失败", "conclusion": f"获取领先提交异常: {str(e)}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"获取领先提交异常: {str(e)}", "detail": ""}

@@ -52,8 +52,7 @@ def get_git_log(since: str = "today", author: str = "",
         if not output.strip():
             return {
                 "status": "成功",
-                "conclusion": f"在 {range_label} 范围内未找到提交记录。",
-                "summary": "",
+                "summary": f"在 {range_label} 范围内未找到提交记录。",
                 "detail": "",
             }
 
@@ -67,14 +66,13 @@ def get_git_log(since: str = "today", author: str = "",
             summary += f" ...等{len(lines)}条"
         return {
             "status": "成功",
-            "conclusion": f"在 {range_label} 范围内找到 {len(lines)} 条提交",
-            "summary": summary,
+            "summary": f"在 {range_label} 范围内找到 {len(lines)} 条提交",
             "detail": output.strip(),
         }
 
     except subprocess.CalledProcessError as e:
-        return {"status": "失败", "conclusion": f"git log 执行出错: {e.output.strip()}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"git log 执行出错: {e.output.strip()}", "detail": ""}
     except FileNotFoundError:
-        return {"status": "失败", "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": "未找到 git 命令，请确认当前目录是 git 仓库。", "detail": ""}
     except Exception as e:
-        return {"status": "失败", "conclusion": f"获取提交日志异常: {str(e)}", "summary": "", "detail": ""}
+        return {"status": "失败", "summary": f"获取提交日志异常: {str(e)}", "detail": ""}

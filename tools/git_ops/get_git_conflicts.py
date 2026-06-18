@@ -23,7 +23,6 @@ def get_git_conflicts(base: str = "", theirs: str = "") -> dict:
         if not conflicted_files:
             return {
                 "status": "成功",
-                "conclusion": "仓库当前无合并冲突，工作区干净。",
                 "summary": "0 个冲突文件",
                 "detail": "git diff --name-only --diff-filter=U 返回空。",
             }
@@ -105,7 +104,6 @@ def get_git_conflicts(base: str = "", theirs: str = "") -> dict:
 
         return {
             "status": "成功",
-            "conclusion": f"检测到 {len(conflicted_files)} 个冲突文件: {', '.join(conflicted_files)}",
             "summary": f"冲突文件({len(conflicted_files)}): {', '.join(conflicted_files)}",
             "detail": detail,
         }
@@ -113,22 +111,19 @@ def get_git_conflicts(base: str = "", theirs: str = "") -> dict:
     except subprocess.CalledProcessError as e:
         return {
             "status": "失败",
-            "conclusion": f"git 命令执行失败: {e.stderr.strip() if e.stderr else str(e)}",
-            "summary": "",
+            "summary": f"git 命令执行失败: {e.stderr.strip() if e.stderr else str(e)}",
             "detail": "",
         }
     except FileNotFoundError:
         return {
             "status": "失败",
-            "conclusion": "未找到 git 命令，请确认当前目录是 git 仓库。",
-            "summary": "",
+            "summary": "未找到 git 命令，请确认当前目录是 git 仓库。",
             "detail": "",
         }
     except Exception as e:
         return {
             "status": "失败",
-            "conclusion": f"获取冲突信息异常: {str(e)}",
-            "summary": "",
+            "summary": f"获取冲突信息异常: {str(e)}",
             "detail": "",
         }
 

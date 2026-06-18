@@ -39,7 +39,7 @@ Compactor（即 TaskCompactor，下同）是每次 SOP 执行完毕后运行的 
 
 Compactor Thinker 的输入覆盖了完整的上下文快照：`USER_MESSAGE`（用户原始输入）、`CURRENT_DIALOGUE`（本轮对话）、`CONVERSATION_HISTORY`（历史对话摘要）、`CURRENT_ACTION`（本次执行目标）、`LONG_TERM_INTENT`（长期意图）、`LATEST_EXECUTION_RESULT`（本次执行结果）、`EXECUTION_HISTORY`（历史执行摘要）。
 
-其中 `LATEST_EXECUTION_RESULT` 不是原始系统日志，而是从 state 的工具字段和 SOP 计划合成：拼接 `tool_status`、`tool_conclusion`、`tool_summary` 和带进度标记的 `sop_plan_steps` 文本，形成一份结构化的执行结果摘要。
+其中 `LATEST_EXECUTION_RESULT` 不是原始系统日志，而是从 state 的工具字段和 SOP 计划合成：拼接 `tool_status`、`tool_summary` 和带进度标记的 `sop_plan_steps` 文本，形成一份结构化的执行结果摘要。
 
 ### 生命周期由代码管理（而非 LLM）
 
