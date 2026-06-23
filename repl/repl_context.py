@@ -32,7 +32,7 @@ class REPLContext:
 
     # ── LLM 节点函数（callable）──
     user_coordinator_fn: Any = None
-    chat_compactor_fn: Any = None
+    compactor_fn: Any = None
     problem_analyzer_fn: Any = None
     sop_summarizer_fn: Any = None
     tool_dispatcher: Any = None

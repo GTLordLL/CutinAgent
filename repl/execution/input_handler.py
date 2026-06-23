@@ -190,9 +190,9 @@ async def _handle_command(ctx: REPLContext, user_msg: str) -> tuple[bool, str]:
 
     # /compact → 手动压缩
     if user_msg.strip().lower().startswith("/compact"):
-        from repl.execution.compaction_controller import run_chat_compactor
-        await run_chat_compactor(
-            ctx.chat_compactor_fn, ctx.state, ctx.top_status_data,
+        from repl.execution.compaction_controller import run_compactor
+        await run_compactor(
+            ctx.compactor_fn, ctx.state, ctx.top_status_data,
             ctx.app, ctx.console, triggered_by="manual"
         )
     else:
@@ -226,7 +226,7 @@ async def _handle_normal_message(ctx: REPLContext, user_msg: str) -> None:
 
     # 自动压缩：上一轮 Thinker 输入超过 4096 tokens
     await try_auto_compact(
-        ctx.state, ctx.chat_compactor_fn, ctx.top_status_data, ctx.app, ctx.console
+        ctx.state, ctx.compactor_fn, ctx.top_status_data, ctx.app, ctx.console
     )
 
     # --- Problem Analyzer ---

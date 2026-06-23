@@ -1,4 +1,4 @@
-"""ChatCompactor Formatter 输出校验器。
+"""Compactor Formatter 输出校验器。
 
 校验单字段结构：CONVERSATION_SUMMARY
 """
@@ -6,8 +6,8 @@
 import re
 
 
-def validate_chat_compactor_output(raw_output: str) -> tuple:
-    """校验 ChatCompactor Formatter 的输出。
+def validate_compactor_output(raw_output: str) -> tuple:
+    """校验 Compactor Formatter 的输出。
 
     Args:
         raw_output: Formatter 的原始输出文本。

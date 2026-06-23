@@ -1,6 +1,6 @@
 """SopSummarizer 单阶段 LLM 节点。
 
-在 SOP 执行完成后运行，读取 USER_INSTRUCTION + EXECUTION_HISTORY，
+在 SOP 执行完成后运行，读取 USER_INSTRUCTION + SOP_PLAN_WITH_RESULTS（sop_plan_steps），
 输出 1-3 句中文总结（纯文本，≤500 字符）。
 
 单阶段设计：直接调用 stream_llm()，不走 Thinker+Formatter 双阶段。
@@ -25,17 +25,17 @@ def sop_summarizer_node(resources, headless=False):
 
     def summarize(state: dict) -> dict:
         user_instruction = state.get("user_instruction", "")
-        execution_history = state.get("execution_history", "")
+        sop_plan_steps = state.get("sop_plan_steps", "")
 
-        # 截断 execution_history 到末尾 4000 字符
-        truncated_history = execution_history
-        if len(execution_history) > 4000:
-            truncated_history = "..." + execution_history[-4000:]
+        # 截断 sop_plan_steps 到末尾 4000 字符
+        truncated_steps = sop_plan_steps
+        if len(sop_plan_steps) > 4000:
+            truncated_steps = "..." + sop_plan_steps[-4000:]
 
         # 构建 <|im_start|> 格式 prompt
         user_input = (
             f"USER_INSTRUCTION: {user_instruction}\n\n"
-            f"EXECUTION_HISTORY: {truncated_history or 'None'}"
+            f"SOP_PLAN_WITH_RESULTS: {truncated_steps or 'None'}"
         )
         prompt_text = (
             f"<|im_start|>system\n{_prompt}<|im_end|>\n"

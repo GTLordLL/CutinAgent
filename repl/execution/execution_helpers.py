@@ -70,17 +70,15 @@ def load_sop_and_init_state(
 
 
 def record_execution_summaries(state: dict) -> None:
-    """将 SopSummarizer 摘要追加到对话/执行历史（原地修改）。
+    """将 SopSummarizer 摘要追加到执行历史（原地修改）。
 
-    替代旧 record_compactor_summaries，始终记录（无满意度判断）。
-    从 sop_summary 字段读取摘要，同时写入 conversation_history 和 execution_history。
+    只写入 execution_history（conversation_history 由 Compactor 统一管理）。
+    从 sop_summary 字段读取摘要，清空 current_dialogue。
     """
     summary = state.get("sop_summary", "")
     if summary:
         sop_label = f"[SOP:{state.get('matched_sop_id', '')}]"
         entry = f"{sop_label} {summary}"
-        conv = state.get("conversation_history", "")
-        state["conversation_history"] = conv + "\n" + entry if conv else entry
         exec_hist = state.get("execution_history", "")
         state["execution_history"] = exec_hist + "\n" + entry if exec_hist else entry
     state["current_dialogue"] = []

@@ -49,12 +49,12 @@ class OverallState(TypedDict):
     analyzer_rounds_used: int         # 实际使用的工具调用轮数
 
     # === REPL 循环状态 (UserCoordinator + Compactor) ===
-    conversation_history: str       # Compactor 压缩追加的对话历史
-    execution_history: str          # Compactor 压缩追加的执行历史
+    conversation_history: str       # Compactor 全量压缩的上下文（覆盖模式）
+    execution_history: str          # Analyzer 工具结果 + SopSummarizer 输出（增量追加）
     current_dialogue: list           # 自上次 Compactor 运行以来的消息列表 [{"role":"user"|"agent"|"feedback"|"error", "content":str}]
     chat_message: str               # UserCoordinator 的聊天回复（始终输出）
     tool_call: str                  # UserCoordinator 输出的 TOOL_CALL 字符串（Phase 2 统一调用格式）
-    # === ChatCompactor ===
+    # === Compactor ===
     thinker_input_tokens: int           # UserCoordinator Thinker 输入 token 数（用于自动压缩阈值判断）
     chat_compact_requirement: str       # /compact 携带的用户压缩要求
-    chat_conversation_summary: str      # ChatCompactor 输出的对话摘要
+    chat_conversation_summary: str      # Compactor 输出的对话摘要

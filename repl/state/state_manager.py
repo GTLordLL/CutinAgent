@@ -37,7 +37,7 @@ def create_initial_state(user_query: str, session_dir: str,
         "current_dialogue": [],
         "chat_message": "",
         "tool_call": "",
-        # ChatCompactor
+        # Compactor
         "thinker_input_tokens": 0,
         "chat_compact_requirement": "",
         "chat_conversation_summary": "",

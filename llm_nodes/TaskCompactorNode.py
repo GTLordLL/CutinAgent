@@ -1,7 +1,10 @@
 """TaskCompactor LLM 节点。
 
-在 SOP 执行完成后运行，评估执行结果并生成 dialogue 和 execution 两维度摘要。
-Thinker (temp 0.4) + Formatter (temp 0.0) 双阶段。
+DEPRECATED: 已被 SopSummarizerNode + Compactor 替代。
+SopSummarizerNode 负责 SOP 执行总结（→ execution_history），
+Compactor 负责全量压缩（→ conversation_history 覆盖写入）。
+
+保留此文件作参考，未来可能合并功能。
 """
 
 from rich.console import Console

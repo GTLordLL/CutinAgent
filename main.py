@@ -9,7 +9,7 @@ from utils.cancel_token import reset_cancel
 from utils.tts_engine import speak_async, preload as preload_tts, is_loaded as tts_is_loaded
 from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
-from llm_nodes.ChatCompactorNode import chat_compactor_node
+from llm_nodes.ChatCompactorNode import compactor_node
 from llm_nodes.ProblemAnalyzerNode import problem_analyzer_node
 from llm_nodes.SopSummarizerNode import sop_summarizer_node
 from tools.ToolDispatcher import ToolDispatcher
@@ -98,7 +98,7 @@ async def run_repl():
 
     # ── 3. 创建节点可调用对象 ────────────────────────────────────
     user_coordinator_fn = user_coordinator_node(resources)
-    chat_compactor_fn = chat_compactor_node(resources)
+    compactor_fn = compactor_node(resources)
     problem_analyzer_fn = problem_analyzer_node(resources)
     sop_summarizer_fn = sop_summarizer_node(resources)
     tool_dispatcher = ToolDispatcher(
@@ -165,7 +165,7 @@ async def run_repl():
         app_graph=app_graph,
         session_dir=session_dir,
         user_coordinator_fn=user_coordinator_fn,
-        chat_compactor_fn=chat_compactor_fn,
+        compactor_fn=compactor_fn,
         problem_analyzer_fn=problem_analyzer_fn,
         sop_summarizer_fn=sop_summarizer_fn,
         tool_dispatcher=tool_dispatcher,

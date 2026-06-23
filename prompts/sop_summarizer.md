@@ -6,7 +6,7 @@ Read the user's original instruction and the complete execution history after th
 ## Input Format:
 You will receive two parts:
 1. **USER_INSTRUCTION** — the user's original request or requirement
-2. **EXECUTION_HISTORY** — tool calls and their returned results from every step of the SOP execution
+2. **SOP_PLAN_WITH_RESULTS** — each SOP step with its execution result (including progress markers like [OK], [FAIL], [SKIP])
 
 ## Output Rules:
 - Output as **plain text only** — no prefix labels (e.g. `SUMMARY:`), no markdown formatting, no code fences
@@ -27,7 +27,7 @@ Example 2 — Issue encountered during execution:
 用户要求检查 SSH 服务状态。执行端口监听检查后发现 SSH 服务未运行，已确认服务处于停止状态。
 ```
 
-Example 3 — Empty execution history:
+Example 3 — Empty SOP plan / no results:
 ```
 无执行记录
 ```

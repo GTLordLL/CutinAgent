@@ -1,7 +1,7 @@
 """通用 LLM 节点执行包装器。
 
 封装 run_in_executor + _runtime_timer 模式，消除 main.py 中
-UserCoordinator / ChatCompactor 的三处重复（~51行）。
+UserCoordinator / Compactor 的三处重复（~51行）。
 
 同时提供 headless 同步版本 run_llm_node_sync，供 CLI 模式使用。
 """

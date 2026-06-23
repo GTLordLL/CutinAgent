@@ -1,6 +1,6 @@
 """Thinker + Formatter 双阶段推理共享引擎。
 
-将 5 个 LLM 节点（UserCoordinator / TaskCompactor / ChatCompactor /
+将 5 个 LLM 节点（UserCoordinator / TaskCompactor / Compactor /
 ProblemAnalyzer / SopExecutionScheduler）中完全相同的流程提取为单一可复用函数：
 
     Thinker 推理 → Formatter 重试循环 → Validator 兜底 → log_node_io

@@ -169,7 +169,7 @@ def _execute_direct_sop(state, resources, app_graph, args, session_dir) -> Headl
     )
     state["tool_call"] = f"{args.sop}()"
 
-    # 构建 TaskCompactor（headless 模式：不输出到终端）
+    # 构建 SopSummarizer（headless 模式：不输出到终端）
     sop_summarizer_fn = sop_summarizer_node(resources, headless=True)
 
     return execute_sop_flow_headless(
