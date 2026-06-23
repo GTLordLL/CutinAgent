@@ -24,12 +24,9 @@ def detect_interrupt_resume(state: dict) -> bool:
 def resume_state_fields(
     state: dict,
     saved_action: str,
-    saved_long_term: str,
 ) -> None:
     """填充 INTERRUPT 恢复所需的 state 字段（原地修改）。"""
     state["user_instruction"] = saved_action
-    state["current_action"] = saved_action
-    state["long_term_intent"] = saved_long_term
     state["current_round"] = 0
 
 
@@ -39,7 +36,6 @@ def load_sop_and_init_state(
     valid_tool_ids: set,
     saved_sop_id: str,
     saved_action: str,
-    saved_long_term: str,
 ) -> dict:
     """加载 SOP markdown 并初始化 state 字段。
 
@@ -52,7 +48,6 @@ def load_sop_and_init_state(
         valid_tool_ids: 合法工具 ID 集合
         saved_sop_id: 匹配的 SOP ID
         saved_action: 用户意图/行动描述
-        saved_long_term: 长期意图
     """
     sop_md = load_sop_markdown(saved_sop_id, sop_dir, valid_tool_ids)
     state = reset_sop_state(state)
@@ -68,27 +63,26 @@ def load_sop_and_init_state(
             else 3
         ),
         "user_instruction": saved_action,
-        "current_action": saved_action,
-        "long_term_intent": saved_long_term,
         "task_status": "ONGOING",
         "current_round": 0,
     })
     return state
 
 
-def record_compactor_summaries(state: dict, is_satisfied: bool = True) -> None:
-    """将 Compactor 摘要追加到对话/执行历史（原地修改）。
+def record_execution_summaries(state: dict) -> None:
+    """将 SopSummarizer 摘要追加到对话/执行历史（原地修改）。
 
-    Args:
-        state: 当前 state dict
-        is_satisfied: 用户是否满意（headless 模式始终为 True）
+    替代旧 record_compactor_summaries，始终记录（无满意度判断）。
+    从 sop_summary 字段读取摘要，同时写入 conversation_history 和 execution_history。
     """
-    if not is_satisfied:
-        return
-    if state.get("compactor_conversation_summary"):
-        state["conversation_history"] += "\n" + state["compactor_conversation_summary"]
-    if state.get("compactor_execution_summary"):
-        state["execution_history"] += "\n" + state["compactor_execution_summary"]
+    summary = state.get("sop_summary", "")
+    if summary:
+        sop_label = f"[SOP:{state.get('matched_sop_id', '')}]"
+        entry = f"{sop_label} {summary}"
+        conv = state.get("conversation_history", "")
+        state["conversation_history"] = conv + "\n" + entry if conv else entry
+        exec_hist = state.get("execution_history", "")
+        state["execution_history"] = exec_hist + "\n" + entry if exec_hist else entry
     state["current_dialogue"] = []
 
 

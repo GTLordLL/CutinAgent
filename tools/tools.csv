@@ -15,3 +15,6 @@ get_system_health,"SYSTEM, health, cpu, mem, disk, load, time, ntp",gather,专�
 list_top_processes,"PROCESS, top, cpu, memory, ps",gather,列出CPU或内存占用最高的进程，自动识别异常高耗能进程。,"{""sort_by"": ""str (default cpu)"", ""limit"": ""int (default 5)""}",sort_by: 排序字段 cpu/mem。limit: 返回条数，默认5，上限20。
 run_command,"SHELL, command, bash, read-only, diagnostic, system",gather,在 Linux bash 环境中执行只读/信息采集类 shell 命令。支持管道 |、stderr 抑制 2>/dev/null、文件通配符。标准 GNU 工具（如 ss/grep/awk/journalctl/du 等）。如需同时执行多个命令，可使用 run_command(command='ss -tlnp') | run_command(command='free -h') 语法。仅限只读操作，禁止任何修改类命令。,"{""command"": ""str""}",command: 要执行的shell命令字符串（必填）。
 check_file_access,"FILE, permission, ownership, unix, access",gather,检查文件/目录的Unix权限、所有者、所属组及当前进程访问能力。,"{""path"": ""str""}",path: 要检查的文件或目录路径（必填）。
+GIT_SMART_COMMIT,"GIT, commit, stage, add, conventional-commits, message",composite,"扫描Git工作区变更，自动生成conventional commit message并提交。","{""files"": ""str (default . 表示全部)""}",files: 要提交的文件路径，默认'.'表示全部。
+GIT_BRANCH_CLEANUP,"GIT, branch, cleanup, merged, delete, stale",composite,"扫描本地分支列表，识别已合并且可安全删除的过期分支并清理。",{},无需参数。
+GIT_PR_CREATE,"GIT, PR, pull-request, description, generate, prepare, push, create, publish, github",composite,"分析当前分支变更，生成PR描述，经用户确认后推送并创建GitHub Pull Request。",{},无需参数。

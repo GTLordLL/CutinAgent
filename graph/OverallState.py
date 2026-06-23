@@ -53,12 +53,7 @@ class OverallState(TypedDict):
     execution_history: str          # Compactor 压缩追加的执行历史
     current_dialogue: list           # 自上次 Compactor 运行以来的消息列表 [{"role":"user"|"agent"|"feedback"|"error", "content":str}]
     chat_message: str               # UserCoordinator 的聊天回复（始终输出）
-    current_action: str             # UserCoordinator 输出的当前 SOP 执行行动
-    long_term_intent: str           # UserCoordinator 输出的长远意图规划
-    is_execute: str                  # UserCoordinator 输出的执行闸门："true" 表示确认完毕可执行
-    compactor_evaluation: str       # Compactor 对此次执行的评价
-    compactor_conversation_summary: str  # Compactor 输出的对话摘要
-    compactor_execution_summary: str     # Compactor 输出的执行摘要
+    tool_call: str                  # UserCoordinator 输出的 TOOL_CALL 字符串（Phase 2 统一调用格式）
     # === ChatCompactor ===
     thinker_input_tokens: int           # UserCoordinator Thinker 输入 token 数（用于自动压缩阈值判断）
     chat_compact_requirement: str       # /compact 携带的用户压缩要求

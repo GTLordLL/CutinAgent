@@ -359,11 +359,56 @@ async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
 
 # ── 协调器 + SOP 执行 ─────────────────────────────────────────
 
+async def _route_tool_call(ctx: REPLContext, tool_call_str: str) -> dict:
+    """解析 tool_call 字符串，通过 ToolDispatcher 统一路由。
+
+    - composite 工具 → dispatch_composite() → execute_sop_flow
+    - atomic 工具 → dispatch()（未来 UserCoordinator 可直接调用原子工具）
+    """
+    from parsers.tool_call import parse_single_call
+
+    # 获取参数名列表用于位置参数解析
+    tool_id_hint = tool_call_str.split("(")[0].strip() if "(" in tool_call_str else ""
+    param_names = ctx.tool_dispatcher.get_param_names(tool_id_hint) if tool_id_hint else []
+    parsed = parse_single_call(tool_call_str, param_names)
+
+    if parsed is None:
+        ctx.console.print(
+            f"[bold red]工具调用解析失败: {tool_call_str[:80]}[/bold red]"
+        )
+        return {}
+
+    tool_id, args = parsed
+
+    if ctx.tool_dispatcher.is_composite(tool_id):
+        return await ctx.tool_dispatcher.dispatch_composite(
+            tool_id, args,
+            state=ctx.state,
+            resources=ctx.resources,
+            app_graph=ctx.app_graph,
+            valid_tool_ids=ctx.valid_tool_ids,
+            sop_summarizer_fn=ctx.sop_summarizer_fn,
+            session_dir=ctx.session_dir,
+            top_status_data=ctx.top_status_data,
+            status_data=ctx.status_data,
+            app=ctx.app,
+            console=ctx.console,
+            set_status_fn=lambda text: repl_set_status(ctx, text),
+            wait_confirm_fn=lambda: repl_wait_confirm(ctx),
+        )
+
+    # 非 composite 工具：走原子 dispatch
+    ctx.console.print(
+        f"[dim][ToolDispatcher] 原子工具调用: {tool_id}"
+        f"({', '.join(f'{k}={v}' for k, v in args.items())})[/dim]"
+    )
+    return ctx.tool_dispatcher.dispatch(tool_id, args)
+
+
 async def _run_coordinator_and_execute(ctx: REPLContext) -> None:
-    """运行 UserCoordinator → TTS 播报 → IS_EXECUTE 判断 → SOP 执行。"""
+    """运行 UserCoordinator → TTS 播报 → ToolDispatcher 路由 → SOP 执行。"""
     from repl import print_agent_message
     from repl.execution.llm_runner import run_llm_node
-    from repl.execution.execution_controller import execute_sop_flow
     from utils.tts_engine import tts_say
 
     repl_set_status(ctx, "分析中...")
@@ -397,15 +442,10 @@ async def _run_coordinator_and_execute(ctx: REPLContext) -> None:
     )
     repl_set_status(ctx, ctx.state.get("matched_sop_id", ""))
 
-    # --- 判断模式 ---
-    if ctx.state.get("is_execute") == "true":
-        result = await execute_sop_flow(
-            ctx.state, ctx.resources, ctx.app_graph, ctx.valid_tool_ids,
-            ctx.task_compactor_fn, ctx.session_dir,
-            ctx.top_status_data, ctx.status_data, ctx.app, ctx.console,
-            lambda text: repl_set_status(ctx, text),
-            lambda: repl_wait_confirm(ctx),
-        )
+    # --- 通过 ToolDispatcher 统一路由 tool_call ---
+    tool_call_str = ctx.state.get("tool_call", "")
+    if tool_call_str and tool_call_str != "NONE":
+        result = await _route_tool_call(ctx, tool_call_str)
         # execute_sop_flow 返回 feedback dict 表示用户拒绝执行
         if isinstance(result, dict) and "feedback" in result:
             user_msg = result["feedback"]

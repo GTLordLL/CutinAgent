@@ -9,9 +9,9 @@ from utils.cancel_token import reset_cancel
 from utils.tts_engine import speak_async, preload as preload_tts, is_loaded as tts_is_loaded
 from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
-from llm_nodes.TaskCompactorNode import task_compactor_node
 from llm_nodes.ChatCompactorNode import chat_compactor_node
 from llm_nodes.ProblemAnalyzerNode import problem_analyzer_node
+from llm_nodes.SopSummarizerNode import sop_summarizer_node
 from tools.ToolDispatcher import ToolDispatcher
 from repl import (
     # State
@@ -62,6 +62,27 @@ from repl.execution.input_handler import (
 console = Console()
 
 
+def _make_composite_executor():
+    """工厂函数：返回 composite 工具的执行回调（闭包延迟导入 execute_sop_flow）。
+
+    ToolDispatcher.dispatch_composite() 将 tool_id/args + exec_kwargs 透传至此，
+    回调负责设置 state["matched_sop_id"] / state["tool_call"] 并委派给 execute_sop_flow。
+    """
+    async def _exec(sop_id, args, **exec_kwargs):
+        from repl.execution.execution_controller import execute_sop_flow
+        state = exec_kwargs.pop("state", {})
+        state["matched_sop_id"] = sop_id
+        if args:
+            args_str = ", ".join(
+                f"{k}={repr(v)}" for k, v in args.items()
+            )
+            state["tool_call"] = f"{sop_id}({args_str})"
+        else:
+            state["tool_call"] = f"{sop_id}()"
+        return await execute_sop_flow(state=state, **exec_kwargs)
+    return _exec
+
+
 async def run_repl():
     """REPL 主循环：Application(full_screen=False) 常驻输入区 + patch_stdout 分流输出。"""
 
@@ -77,10 +98,13 @@ async def run_repl():
 
     # ── 3. 创建节点可调用对象 ────────────────────────────────────
     user_coordinator_fn = user_coordinator_node(resources)
-    task_compactor_fn = task_compactor_node(resources)
     chat_compactor_fn = chat_compactor_node(resources)
     problem_analyzer_fn = problem_analyzer_node(resources)
-    tool_dispatcher = ToolDispatcher()
+    sop_summarizer_fn = sop_summarizer_node(resources)
+    tool_dispatcher = ToolDispatcher(
+        tools_df=resources.tools_df,
+        composite_executor=_make_composite_executor(),
+    )
 
     # ── 4. 会话目录 ────────────────────────────────────────────
     session_dir = create_session_dir()
@@ -139,9 +163,9 @@ async def run_repl():
         app_graph=app_graph,
         session_dir=session_dir,
         user_coordinator_fn=user_coordinator_fn,
-        task_compactor_fn=task_compactor_fn,
         chat_compactor_fn=chat_compactor_fn,
         problem_analyzer_fn=problem_analyzer_fn,
+        sop_summarizer_fn=sop_summarizer_fn,
         tool_dispatcher=tool_dispatcher,
         state=state,
         valid_tool_ids=valid_tool_ids,

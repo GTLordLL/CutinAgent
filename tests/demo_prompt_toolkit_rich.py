@@ -303,8 +303,7 @@ FORMATTER_DEMO = """\
 {
   "output_type": "CHAT_MESSAGE",
   "message": "你好！我是 CutinAgent，一个 SOP 驱动的 AI 助手。请问有什么可以帮助你的？",
-  "matched_sop_id": null,
-  "is_execute": false
+  "matched_sop_id": null
 }"""
 
 STEPS_DEMO = [

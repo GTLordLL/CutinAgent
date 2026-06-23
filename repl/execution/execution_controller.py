@@ -22,7 +22,7 @@ from repl.execution.execution_helpers import (
     detect_interrupt_resume,
     resume_state_fields,
     load_sop_and_init_state,
-    record_compactor_summaries,
+    record_execution_summaries,
     write_sop_run_summary,
 )
 
@@ -47,9 +47,7 @@ async def _confirm_execution(
 
     console.print(Panel(
         f"[bold]确认执行[/bold]\n"
-        f"SOP: {state['matched_sop_id']}\n"
-        f"行动: {state['current_action']}\n"
-        f"长期计划: {state['long_term_intent']}",
+        f"SOP 调用: {state.get('tool_call', state['matched_sop_id'])}",
         title="确认", title_align="left", padding=(0, 1),
     ))
     set_status_fn("确认执行? (y=执行 / n=重新规划 / 或输入补充信息)")
@@ -74,7 +72,6 @@ def _load_sop_for_execution(
     valid_tool_ids: set,
     is_resume: bool,
     saved_action: str,
-    saved_long_term: str,
     console: Console,
 ) -> dict | None:
     """加载 SOP markdown 并填充 state 字段。
@@ -89,7 +86,7 @@ def _load_sop_for_execution(
     saved_sop_id = state["matched_sop_id"]
 
     if is_resume:
-        resume_state_fields(state, saved_action, saved_long_term)
+        resume_state_fields(state, saved_action)
         console.print(Panel(
             f"从中断点恢复执行: [bold]{saved_sop_id}[/bold]\n"
             f"行动: {saved_action}",
@@ -100,7 +97,7 @@ def _load_sop_for_execution(
     try:
         return load_sop_and_init_state(
             state, resources.sop_dir, valid_tool_ids,
-            saved_sop_id, saved_action, saved_long_term,
+            saved_sop_id, saved_action,
         )
     except ValueError as e:
         console.print(f"[bold red]SOP 加载失败: {e}[/bold red]")
@@ -116,7 +113,7 @@ def _load_sop_for_execution(
 async def _execute_sop_with_timer(
     state: dict,
     app_graph,
-    task_compactor_fn,
+    sop_summarizer_fn,
     console: Console,
     app,
     top_status_data: dict,
@@ -193,23 +190,29 @@ async def _execute_sop_with_timer(
         set_status_fn(f"完成: {state['matched_sop_id']}")
         tts_say(f"SOP执行完毕。状态: {final_task_status}，耗时 {sop_elapsed:.0f} 秒，共 {total_rounds} 轮。")
 
-        # ── 3b. TaskCompactor（复用 SOP 计时器）──
-        console.print("[dim][TaskCompactor] 评价与总结中...[/dim]")
-        compactor_result = await loop.run_in_executor(
-            None, task_compactor_fn, state
-        )
-        await asyncio.sleep(0.3)
-        state.update(compactor_result)
-
         total_elapsed = time.time() - sop_start
-        console.print(f"[dim]总耗时 (SOP + TaskCompactor): {fmt_elapsed(total_elapsed)}[/dim]")
+        console.print(f"[dim]总耗时: {fmt_elapsed(total_elapsed)}[/dim]")
 
-        console.print()
-        console.print(Panel(
-            state["compactor_evaluation"],
-            title="执行评价", title_align="left", padding=(0, 1),
-        ))
-        tts_say(state["compactor_evaluation"])
+        # ── 3b. SopSummarizer ──
+        try:
+            summarizer_result = await loop.run_in_executor(
+                None, sop_summarizer_fn, state
+            )
+            state.update(summarizer_result)
+            summary = state.get("sop_summary", "")
+            if summary:
+                console.print(f"[dim][SopSummarizer] {summary}[/dim]")
+        except Exception:
+            pass  # 总结失败不影响主流程
+
+        summary = state.get("sop_summary", "")
+        if summary:
+            console.print()
+            console.print(Panel(
+                summary,
+                title="执行总结", title_align="left", padding=(0, 1),
+            ))
+            tts_say(summary)
 
         return state, node_timings, final_task_status, total_rounds, sop_start, sop_elapsed
 
@@ -222,33 +225,19 @@ async def _execute_sop_with_timer(
         app.invalidate()
 
 
-# ── Phase 4: 满意度确认 ──────────────────────────────────────────
+# ── Phase 4: 自动记录 ────────────────────────────────────────────
 
-async def _finalize_execution(
-    state: dict,
-    console: Console,
-    set_status_fn,
-    wait_confirm_fn,
-    final_task_status: str,
-) -> tuple[dict, str]:
-    """满意度确认 + 执行状态清理。
+def _finalize_execution(state: dict, final_task_status: str) -> tuple[dict, str]:
+    """执行后清理：自动记录 SopSummarizer 摘要，FINISH 时重置 SOP 状态。
 
     Returns:
         (state, user_query): user_query 供 write_sop_run_summary 使用
     """
-    set_status_fn("满意吗? (y/n)")
-    satisfied = await wait_confirm_fn()
+    record_execution_summaries(state)
 
-    _run_user_query = state.get("current_action", "")
+    _run_user_query = state.get("user_instruction", "")
 
-    if satisfied.lower() == 'y':
-        record_compactor_summaries(state, is_satisfied=True)
-        console.print("[dim]总结已记录。可以继续下一个任务了。[/dim]")
-        tts_say("总结已记录。可以继续下一个任务了。")
-        if final_task_status == "FINISH":
-            state = reset_sop_state(state)
-    else:
-        console.print("[dim]总结未记录。请告诉我如何调整？[/dim]")
+    if final_task_status == "FINISH":
         state = reset_sop_state(state)
 
     return state, _run_user_query
@@ -261,7 +250,7 @@ async def execute_sop_flow(
     resources,
     app_graph,
     valid_tool_ids: set,
-    task_compactor_fn,
+    sop_summarizer_fn,
     session_dir: str,
     top_status_data: dict,
     status_data: dict,
@@ -270,7 +259,7 @@ async def execute_sop_flow(
     set_status_fn,
     wait_confirm_fn,
 ) -> dict:
-    """SOP 执行主流程：确认 → 加载 → 执行+Compactor → 满意度 → 摘要。
+    """SOP 执行主流程：确认 → 加载 → 执行+SopSummarizer → 自动记录 → 摘要。
 
     Args:
         set_status_fn: 更新底部状态栏的回调，签名 (text: str) -> None
@@ -280,8 +269,7 @@ async def execute_sop_flow(
     is_resume = detect_interrupt_resume(state)
 
     saved_sop_id = state["matched_sop_id"]
-    saved_action = state["current_action"]
-    saved_long_term = state["long_term_intent"]
+    saved_action = state.get("user_instruction", "")
 
     # ── 1. 确认 ──
     feedback = await _confirm_execution(
@@ -293,26 +281,24 @@ async def execute_sop_flow(
     # ── 2. 加载 SOP ──
     loaded = _load_sop_for_execution(
         state, resources, valid_tool_ids, is_resume,
-        saved_action, saved_long_term, console,
+        saved_action, console,
     )
     if loaded is None:
         return state
     state = loaded
 
-    # ── 3. 执行 SOP 图 + TaskCompactor ──
+    # ── 3. 执行 SOP 图 + SopSummarizer ──
     state, node_timings, final_task_status, total_rounds, sop_start, sop_elapsed = (
         await _execute_sop_with_timer(
-            state, app_graph, task_compactor_fn,
+            state, app_graph, sop_summarizer_fn,
             console, app, top_status_data, set_status_fn,
         )
     )
     if node_timings is None:
         return state  # 图执行崩溃，错误信息已在 state 中
 
-    # ── 4. 满意度 ──
-    state, _run_user_query = await _finalize_execution(
-        state, console, set_status_fn, wait_confirm_fn, final_task_status
-    )
+    # ── 4. 自动记录 ──
+    state, _run_user_query = _finalize_execution(state, final_task_status)
 
     # ── 5. 写 RUN_SUMMARY ──
     write_sop_run_summary(
@@ -334,7 +320,7 @@ def execute_sop_flow_headless(
     resources,
     app_graph,
     valid_tool_ids: set,
-    task_compactor_fn,
+    sop_summarizer_fn,
     session_dir: str,
 ) -> dict:
     """执行完整的 SOP 流程（Headless 模式，无 TUI 依赖）。
@@ -361,19 +347,18 @@ def execute_sop_flow_headless(
     try:
         # ── 1. 加载 SOP ──
         saved_sop_id = state["matched_sop_id"]
-        saved_action = state.get("current_action", state.get("user_instruction", ""))
-        saved_long_term = state.get("long_term_intent", "")
+        saved_action = state.get("user_instruction", "")
 
         is_resume = detect_interrupt_resume(state)
 
         if is_resume:
             # 保留 sop_plan_steps（含进度标记）和 task_status="INTERRUPT"
-            resume_state_fields(state, saved_action, saved_long_term)
+            resume_state_fields(state, saved_action)
         else:
             try:
                 state = load_sop_and_init_state(
                     state, resources.sop_dir, valid_tool_ids,
-                    saved_sop_id, saved_action, saved_long_term,
+                    saved_sop_id, saved_action,
                 )
             except ValueError as e:
                 result.status = "error"
@@ -395,19 +380,22 @@ def execute_sop_flow_headless(
 
         sop_elapsed = time.time() - t_start
 
-        # ── 3. TaskCompactor（同步，无定时器）──
-        compactor_result, _compactor_elapsed = run_llm_node_sync(
-            "TaskCompactor", task_compactor_fn, state
-        )
-        state.update(compactor_result)
+        # ── 3. SopSummarizer ──
+        try:
+            summarizer_result, _ = run_llm_node_sync(
+                "SopSummarizer", sop_summarizer_fn, state
+            )
+            state.update(summarizer_result)
+        except Exception:
+            pass
 
         total_elapsed = time.time() - t_start
 
         # ── 4. 自动记录总结（headless 无人确认，默认记录）──
-        record_compactor_summaries(state)
+        record_execution_summaries(state)
 
         # 保存 RUN_SUMMARY 所需字段（reset_sop_state 会清除）
-        _run_user_query = state.get("current_action", "")
+        _run_user_query = state.get("user_instruction", "")
 
         # FINISH 后清除执行状态，避免残留 INTERRUPT 干扰后续执行
         if final_task_status == "FINISH":
@@ -436,9 +424,7 @@ def execute_sop_flow_headless(
         result.total_rounds = total_rounds
         result.total_duration_s = total_elapsed
         result.node_outputs = node_outputs
-        result.compactor_evaluation = state.get("compactor_evaluation", "")
-        result.compactor_conversation_summary = state.get("compactor_conversation_summary", "")
-        result.compactor_execution_summary = state.get("compactor_execution_summary", "")
+        result.sop_summary = state.get("sop_summary", "")
         result.variables = variables_snapshot
         result.final_report = state.get("final_report", "")
         result.session_dir = session_dir

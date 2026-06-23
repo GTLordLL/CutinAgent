@@ -17,6 +17,7 @@ class HeadlessRunResult:
     compactor_evaluation: str = ""
     compactor_conversation_summary: str = ""
     compactor_execution_summary: str = ""
+    sop_summary: str = ""            # SopSummarizer 输出（Phase 3 替代 Compactor）
     variables: dict[str, str] = field(default_factory=dict)
     final_report: str = ""
     session_dir: str = ""
@@ -61,9 +62,10 @@ def format_plain(result: HeadlessRunResult) -> str:
             detail_str = " | ".join(detail) if detail else "(no output)"
             lines.append(f"[{node}] {dur:.2f}s | {detail_str}")
 
-    # Compactor
-    if result.compactor_evaluation:
-        lines.append(f"\n--- Compactor ---\n{result.compactor_evaluation}")
+    # Summary（SopSummarizer 替代旧 Compactor）
+    summary_text = result.sop_summary
+    if summary_text:
+        lines.append(f"\n--- Summary ---\n{summary_text}")
 
     # Final report
     if result.final_report:
@@ -91,9 +93,9 @@ def _format_json_minimal(result: HeadlessRunResult) -> str:
         "duration_s": round(result.total_duration_s, 1),
     }
 
-    # 结果文本：优先 compactor 执行摘要 → final_report → chat_message
+    # 结果文本：优先 sop_summary → final_report → chat_message
     result_text = (
-        result.compactor_execution_summary
+        result.sop_summary
         or result.final_report
         or result.chat_message
     )
@@ -134,11 +136,7 @@ def format_json_full(result: HeadlessRunResult) -> str:
             }
             for no in result.node_outputs
         ],
-        "compactor": {
-            "evaluation": result.compactor_evaluation,
-            "conversation_summary": result.compactor_conversation_summary,
-            "execution_summary": result.compactor_execution_summary,
-        },
+        "sop_summary": result.sop_summary,
         "variables": result.variables,
         "final_report": result.final_report,
         "session_dir": result.session_dir,

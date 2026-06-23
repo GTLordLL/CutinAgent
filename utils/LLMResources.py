@@ -57,12 +57,11 @@ def initialize_resources() -> LLMResources:
         "user_coordinator_formatter": load_prompt_file("./prompts/user_coordinator/formatter.md"),
         "problem_analyzer_thinker": load_prompt_file("./prompts/problem_analyzer/thinker.md"),
         "problem_analyzer_formatter": load_prompt_file("./prompts/problem_analyzer/formatter.md"),
-        "compactor_thinker": load_prompt_file("./prompts/compactor/thinker.md"),
-        "compactor_formatter": load_prompt_file("./prompts/compactor/formatter.md"),
         "chat_compactor_thinker": load_prompt_file("./prompts/chat_compactor/thinker.md"),
         "chat_compactor_formatter": load_prompt_file("./prompts/chat_compactor/formatter.md"),
         "sop_execution_scheduler_thinker": load_prompt_file("./prompts/sop_execution_scheduler/thinker.md"),
         "sop_execution_scheduler_formatter": load_prompt_file("./prompts/sop_execution_scheduler/formatter.md"),
+        "sop_summarizer": load_prompt_file("./prompts/sop_summarizer.md"),
     }
 
     # 4. 加载工具和 SOP 索引
