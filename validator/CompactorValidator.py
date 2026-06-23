@@ -1,6 +1,6 @@
 """Compactor Formatter 输出校验器。
 
-校验三字段结构：EVALUATION, CONVERSATION_SUMMARY, EXECUTION_SUMMARY
+校验单字段结构：CONVERSATION_SUMMARY
 """
 
 import re
@@ -14,7 +14,7 @@ def validate_compactor_output(raw_output: str) -> tuple:
 
     Returns:
         (is_valid, error_reason, parsed_dict)
-        parsed_dict keys: evaluation, conversation_summary, execution_summary
+        parsed_dict keys: conversation_summary
     """
     text = raw_output.strip()
     # 移除 markdown 代码围栏
@@ -22,51 +22,25 @@ def validate_compactor_output(raw_output: str) -> tuple:
     text = re.sub(r'```\s*$', '', text)
     text = text.strip()
 
-    fields = _parse_fields(text)
-    if fields is None:
-        return False, "无法解析输出格式，缺少必要字段。需要: EVALUATION, CONVERSATION_SUMMARY, EXECUTION_SUMMARY", {}
+    # 解析 CONVERSATION_SUMMARY 字段
+    m = re.search(r'CONVERSATION_SUMMARY:\s*(.+)', text, re.DOTALL)
+    if not m:
+        return False, "无法解析输出格式，缺少必要字段。需要: CONVERSATION_SUMMARY", {}
 
-    evaluation = fields.get("evaluation", "")
-    conversation_summary = fields.get("conversation_summary", "")
-    execution_summary = fields.get("execution_summary", "")
+    conversation_summary = m.group(1).strip()
 
-    # 每个字段都不能为空或 NONE
-    for key, value in [("EVALUATION", evaluation), ("CONVERSATION_SUMMARY", conversation_summary), ("EXECUTION_SUMMARY", execution_summary)]:
-        if not value or value.upper() == "NONE":
-            return False, f"{key} 不能为空或 NONE", fields
+    # 截断：防止字段值穿越到后续标签
+    cut_markers = ["CONVERSATION_SUMMARY:"]
+    for marker in cut_markers:
+        idx = conversation_summary.find(marker)
+        if idx != -1:
+            conversation_summary = conversation_summary[:idx].strip()
+            break
+
+    # 非空 / 非 NONE 检查
+    if not conversation_summary or conversation_summary.upper() == "NONE":
+        return False, "CONVERSATION_SUMMARY 不能为空或 NONE", {"conversation_summary": conversation_summary}
 
     return True, "", {
-        "evaluation": evaluation,
         "conversation_summary": conversation_summary,
-        "execution_summary": execution_summary,
     }
-
-
-def _parse_fields(text: str) -> dict | None:
-    """解析三字段格式输出，返回 dict 或 None。"""
-    field_patterns = [
-        ("evaluation", r'EVALUATION:\s*(.+)'),
-        ("conversation_summary", r'CONVERSATION_SUMMARY:\s*(.+)'),
-        ("execution_summary", r'EXECUTION_SUMMARY:\s*(.+)'),
-    ]
-
-    result = {}
-    for key, pattern in field_patterns:
-        m = re.search(pattern, text, re.DOTALL)
-        if not m:
-            return None
-        result[key] = m.group(1).strip()
-
-    # 修正：每个字段的值截断到下一个字段
-    field_order = ["EVALUATION:", "CONVERSATION_SUMMARY:", "EXECUTION_SUMMARY:"]
-    cleaned = {}
-    for i, key in enumerate(["evaluation", "conversation_summary", "execution_summary"]):
-        value = result[key]
-        for next_prefix in field_order[i+1:]:
-            idx = value.find(next_prefix)
-            if idx != -1:
-                value = value[:idx].strip()
-                break
-        cleaned[key] = value
-
-    return cleaned

@@ -73,7 +73,7 @@ def record_execution_summaries(state: dict) -> None:
     """将 SopSummarizer 摘要追加到执行历史（原地修改）。
 
     只写入 execution_history（conversation_history 由 Compactor 统一管理）。
-    从 sop_summary 字段读取摘要，清空 current_dialogue。
+    current_dialogue 由 Compactor 负责清空，此处不再清除。
     """
     summary = state.get("sop_summary", "")
     if summary:
@@ -81,7 +81,6 @@ def record_execution_summaries(state: dict) -> None:
         entry = f"{sop_label} {summary}"
         exec_hist = state.get("execution_history", "")
         state["execution_history"] = exec_hist + "\n" + entry if exec_hist else entry
-    state["current_dialogue"] = []
 
 
 def write_sop_run_summary(

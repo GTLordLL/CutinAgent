@@ -26,6 +26,8 @@ async def run_compactor(compactor_fn, state: dict,
         True 表示执行了压缩并产生了摘要，False 表示无对话可压缩
     """
     if len(state.get("current_dialogue", [])) == 0:
+        if triggered_by == "manual":
+            console.print("[dim]没有可压缩的对话内容。[/dim]")
         return False
 
     if triggered_by == "auto":

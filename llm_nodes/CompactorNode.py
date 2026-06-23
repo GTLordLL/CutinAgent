@@ -31,7 +31,7 @@ def compactor_node(resources):
                 f"EXECUTION_HISTORY: {execution_history or 'None'}\n"
             )
 
-        from validator.ChatCompactorValidator import validate_compactor_output
+        from validator.CompactorValidator import validate_compactor_output
 
         def map_result(parsed, thinker_tokens, **ctx):
             return {

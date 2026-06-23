@@ -108,7 +108,7 @@ def _load_sop_for_execution(
         return None
 
 
-# ── Phase 3: 执行 SOP 图 + TaskCompactor ───────────────────────────
+# ── Phase 3: 执行 SOP 图 + SopSummarizer ───────────────────────────
 
 async def _execute_sop_with_timer(
     state: dict,
@@ -119,7 +119,7 @@ async def _execute_sop_with_timer(
     top_status_data: dict,
     set_status_fn,
 ) -> tuple:
-    """在一个共享计时器下运行 SOP 图 + TaskCompactor。
+    """在一个共享计时器下运行 SOP 图 + SopSummarizer。
 
     计时器驱动顶部状态栏的 spinner / dots / 颜色动画。
 

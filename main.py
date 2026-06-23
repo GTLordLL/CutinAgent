@@ -9,7 +9,7 @@ from utils.cancel_token import reset_cancel
 from utils.tts_engine import speak_async, preload as preload_tts, is_loaded as tts_is_loaded
 from utils.debug_logger import set_session_dir
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
-from llm_nodes.ChatCompactorNode import compactor_node
+from llm_nodes.CompactorNode import compactor_node
 from llm_nodes.ProblemAnalyzerNode import problem_analyzer_node
 from llm_nodes.SopSummarizerNode import sop_summarizer_node
 from tools.ToolDispatcher import ToolDispatcher
