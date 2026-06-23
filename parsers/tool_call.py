@@ -3,10 +3,23 @@ import json
 
 
 def _build_tool_signature(row) -> str:
-    """从 tools.csv 行构建 Python 函数签名: TOOL_ID(params): \"\"\"param_desc\"\"\" """
-    tool_id = row["Tool_ID"]
+    """从 CSV 行构建 Python 函数签名（兼容 tools.csv 和 sops.csv）。
+
+    格式: TOOL_ID(params): \"\"\"func_desc — param_desc\"\"\"
+    支持 Tool_ID / SOP_ID 双列名，Func_Desc / param_desc 可选。
+    """
+    tool_id = row.get("Tool_ID") or row.get("SOP_ID", "")
+    func_desc = row.get("Func_Desc", "")
     args_schema_str = row.get("Args_Schema", "{}")
     param_desc = row.get("param_desc", "")
+
+    # 构建 docstring: func_desc — param_desc (任一缺失则省略)
+    doc_parts = []
+    if func_desc:
+        doc_parts.append(func_desc)
+    if param_desc:
+        doc_parts.append(param_desc)
+    doc = " — ".join(doc_parts)
 
     try:
         schema = json.loads(args_schema_str)
@@ -14,7 +27,7 @@ def _build_tool_signature(row) -> str:
         schema = {}
 
     if not schema:
-        return f'{tool_id}(): """{param_desc}"""'
+        return f'{tool_id}(): """{doc}"""'
 
     params = []
     for name, desc in schema.items():
@@ -47,7 +60,7 @@ def _build_tool_signature(row) -> str:
             params.append(f"{name}: {ptype}")
 
     sig = f"{tool_id}({', '.join(params)})"
-    return f'{sig}: """{param_desc}"""'
+    return f'{sig}: """{doc}"""'
 
 
 def _split_parallel_calls(tool_call_raw: str) -> list[str]:

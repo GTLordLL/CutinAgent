@@ -103,6 +103,7 @@ async def run_repl():
     sop_summarizer_fn = sop_summarizer_node(resources)
     tool_dispatcher = ToolDispatcher(
         tools_df=resources.tools_df,
+        sops_df=resources.sops_df,
         composite_executor=_make_composite_executor(),
     )
 
@@ -114,7 +115,8 @@ async def run_repl():
     # ── 5. 初始 State ───────────────────────────────────────────
     all_sop_ids = list(resources.sops_df["SOP_ID"].tolist())
     state = create_initial_state("", session_dir, all_sop_ids)
-    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist())
+    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist()) \
+                   | set(resources.sops_df["SOP_ID"].tolist())
 
     # ── 6. TTS 预加载 ──────────────────────────────────────────
     if get_config().get("tts_enabled", False):

@@ -76,6 +76,7 @@ def run_headless(args) -> int:
     # ── 2b. 创建 ToolDispatcher（headless composite_executor 闭包）──
     tool_dispatcher = ToolDispatcher(
         tools_df=resources.tools_df,
+        sops_df=resources.sops_df,
         composite_executor=_make_headless_composite_executor(),
     )
 
@@ -142,7 +143,8 @@ def _execute_direct_sop(state, resources, app_graph, args, session_dir) -> Headl
     加载 SOP markdown，填充 state 的 SOP 字段，设置 IS_EXECUTE=true，
     然后进入 execute_sop_flow_headless。
     """
-    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist())
+    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist()) \
+                   | set(resources.sops_df["SOP_ID"].tolist())
 
     # 加载 SOP
     try:
@@ -188,7 +190,8 @@ def _execute_with_coordinator(state, resources, app_graph, args, session_dir) ->
     """
     coordinator_fn = user_coordinator_node(resources, headless=True)
     sop_summarizer_fn = sop_summarizer_node(resources, headless=True)
-    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist())
+    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist()) \
+                   | set(resources.sops_df["SOP_ID"].tolist())
 
     # 运行 UserCoordinator
     coord_result, coord_elapsed = run_llm_node_sync(

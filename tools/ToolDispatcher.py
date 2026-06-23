@@ -22,7 +22,7 @@ from data_nodes.VariableStore import resolve as resolve_variable
 
 
 class ToolDispatcher:
-    def __init__(self, tools_df=None, composite_executor=None):
+    def __init__(self, tools_df=None, sops_df=None, composite_executor=None):
         # ── 函数映射表（tool_id → callable，仅 atomic 工具）──
         self._func_map = {
             "get_git_status": get_git_status,
@@ -54,26 +54,40 @@ class ToolDispatcher:
                     "Func_Desc", "Args_Schema", "param_desc",
                 ])
 
+        # ── 加载 sops_df（None 时回退加载 CSV）──
+        if sops_df is None:
+            from utils.load_csv import load_csv_df
+            sops_df = load_csv_df("sop/sops.csv")
+            if sops_df is None:
+                import pandas as pd
+                sops_df = pd.DataFrame(columns=[
+                    "SOP_ID", "Keywords", "Tool_Type",
+                    "Func_Desc", "Args_Schema", "param_desc",
+                ])
+
         self._tools_df = tools_df
+        self._sops_df = sops_df
         self._composite_executor = composite_executor
 
-        # ── 按 Tool_Type 分流构建双注册表 ──
+        # ── atomic_toolbox：从 tools_df 加载（仅 action / gather）──
         self.atomic_toolbox: dict[str, callable] = {}
-        self.composite_registry: dict[str, dict] = {}
-
         for _, row in tools_df.iterrows():
             tool_id = row["Tool_ID"]
             tool_type = row.get("Tool_Type", "action")
-            if tool_type == "composite":
-                self.composite_registry[tool_id] = {
-                    "func_desc": row.get("Func_Desc", ""),
-                    "args_schema": row.get("Args_Schema", "{}"),
-                    "param_desc": row.get("param_desc", ""),
-                }
-            else:
+            if tool_type != "composite":
                 func = self._func_map.get(tool_id)
                 if func is not None:
                     self.atomic_toolbox[tool_id] = func
+
+        # ── composite_registry：从 sops_df 加载（所有行均为 composite）──
+        self.composite_registry: dict[str, dict] = {}
+        for _, row in sops_df.iterrows():
+            tool_id = row["SOP_ID"]
+            self.composite_registry[tool_id] = {
+                "func_desc": row.get("Func_Desc", ""),
+                "args_schema": row.get("Args_Schema", "{}"),
+                "param_desc": row.get("param_desc", ""),
+            }
 
         # 向后兼容别名（data_nodes/ToolExecutor 等零参构造引用 .toolbox）
         self.toolbox = self.atomic_toolbox

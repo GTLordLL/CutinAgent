@@ -8,7 +8,7 @@ You are the execution scheduler of an SOP-driven agent. Your job is to read the 
 - **SOP_PLAN**: The full plan with embedded progress traces.
 - **EXCEPTION_HANDLING**: When any step returns unexpected results and SOP_PLAN has no explicit handling logic, the rule tells you to handle.
 - **LAST_STEP**: The step number and description that just finished executing. Used to locate where we are.
-- **AVAILABLE_TOOLS**: `Tool_ID(param: type = default): """param_desc"""`. Provides parameter types, defaults, and value constraints.
+- **AVAILABLE_TOOLS**: `Tool_ID(param: type = default): """func_desc — param_desc"""`. Provides what the tool does, parameter types, defaults, and value constraints.
 
 ## Reasoning Instructions:
 
