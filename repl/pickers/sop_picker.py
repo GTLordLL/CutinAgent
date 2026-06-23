@@ -19,7 +19,7 @@ def create_sop_picker_state() -> dict:
     """创建 SOP 选择器状态 dict（与 status_data / picker_state 模式一致）。"""
     return {
         "active": False,
-        "sops": [],            # list[dict]: {"sop_id", "objective", "description"}
+        "sops": [],            # list[dict]: {"sop_id", "description"}
         "page": 0,
         "selected_index": 0,   # 0..n-1=SOP项, n=确定, n+1=取消
         "selected_ids": set(),  # 当前标记为启用的 SOP_ID 集合

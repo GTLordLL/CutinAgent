@@ -36,13 +36,8 @@ def create_initial_state(user_query: str, session_dir: str,
         "execution_history": "",
         "current_dialogue": [],
         "chat_message": "",
-        "current_action": "",
-        "long_term_intent": "",
-        "is_execute": "false",
-        "compactor_evaluation": "",
-        "compactor_conversation_summary": "",
-        "compactor_execution_summary": "",
-        # ChatCompactor
+        "tool_call": "",
+        # Compactor
         "thinker_input_tokens": 0,
         "chat_compact_requirement": "",
         "chat_conversation_summary": "",
@@ -77,13 +72,8 @@ def reset_sop_state(state: dict) -> dict:
         "current_round": 0,
         "retry_limit": 3,
         "final_report": "",
-        # 重置 UserCoordinator / Compactor 输出
+        # 重置 UserCoordinator 输出
         "chat_message": "",
-        "current_action": "",
-        "long_term_intent": "",
-        "is_execute": "false",
-        "compactor_evaluation": "",
-        "compactor_conversation_summary": "",
-        "compactor_execution_summary": "",
+        "tool_call": "",
     })
     return state

@@ -15,12 +15,13 @@
 
 import asyncio
 import shutil
-import traceback
 
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from repl.repl_context import REPLContext
 from utils.cancel_token import CancellationError, reset_cancel
+from utils.llm_errors import LLMConnectionError
+from utils.error_writer import write_error
 
 
 # ── 模块级辅助函数（原 run_repl 闭包）──────────────────────────
@@ -89,8 +90,18 @@ async def handle_user_input(ctx: REPLContext, user_msg: str) -> None:
         except CancellationError:
             ctx.console.print("\n[bold yellow]已停止当前执行。[/bold yellow]")
             reset_cancel()
-        except Exception:
-            traceback.print_exc()
+        except LLMConnectionError as e:
+            # 连接错误：友好提示 + 写 error 文件
+            error_path = write_error(e, context="LLM 连接失败")
+            ctx.console.print(f"\n[bold red]{e}[/bold red]")
+            ctx.console.print(f"[dim]详细错误已写入: {error_path}[/dim]")
+        except Exception as e:
+            # 其他异常：写 error 文件，终端仅显示文件路径
+            error_path = write_error(e, context="未预期的运行时错误")
+            ctx.console.print(
+                f"\n[bold red]执行出错: {e}[/bold red]\n"
+                f"[dim]详细错误已写入: {error_path}[/dim]"
+            )
         finally:
             ctx.flags["processing"] = False
             repl_set_status(ctx, "")
@@ -190,9 +201,9 @@ async def _handle_command(ctx: REPLContext, user_msg: str) -> tuple[bool, str]:
 
     # /compact → 手动压缩
     if user_msg.strip().lower().startswith("/compact"):
-        from repl.execution.compaction_controller import run_chat_compactor
-        await run_chat_compactor(
-            ctx.chat_compactor_fn, ctx.state, ctx.top_status_data,
+        from repl.execution.compaction_controller import run_compactor
+        await run_compactor(
+            ctx.compactor_fn, ctx.state, ctx.top_status_data,
             ctx.app, ctx.console, triggered_by="manual"
         )
     else:
@@ -226,7 +237,7 @@ async def _handle_normal_message(ctx: REPLContext, user_msg: str) -> None:
 
     # 自动压缩：上一轮 Thinker 输入超过 4096 tokens
     await try_auto_compact(
-        ctx.state, ctx.chat_compactor_fn, ctx.top_status_data, ctx.app, ctx.console
+        ctx.state, ctx.compactor_fn, ctx.top_status_data, ctx.app, ctx.console
     )
 
     # --- Problem Analyzer ---
@@ -359,11 +370,56 @@ async def _run_problem_analyzer_loop(ctx: REPLContext) -> None:
 
 # ── 协调器 + SOP 执行 ─────────────────────────────────────────
 
+async def _route_tool_call(ctx: REPLContext, tool_call_str: str) -> dict:
+    """解析 tool_call 字符串，通过 ToolDispatcher 统一路由。
+
+    - composite 工具 → dispatch_composite() → execute_sop_flow
+    - atomic 工具 → dispatch()（未来 UserCoordinator 可直接调用原子工具）
+    """
+    from parsers.tool_call import parse_single_call
+
+    # 获取参数名列表用于位置参数解析
+    tool_id_hint = tool_call_str.split("(")[0].strip() if "(" in tool_call_str else ""
+    param_names = ctx.tool_dispatcher.get_param_names(tool_id_hint) if tool_id_hint else []
+    parsed = parse_single_call(tool_call_str, param_names)
+
+    if parsed is None:
+        ctx.console.print(
+            f"[bold red]工具调用解析失败: {tool_call_str[:80]}[/bold red]"
+        )
+        return {}
+
+    tool_id, args = parsed
+
+    if ctx.tool_dispatcher.is_composite(tool_id):
+        return await ctx.tool_dispatcher.dispatch_composite(
+            tool_id, args,
+            state=ctx.state,
+            resources=ctx.resources,
+            app_graph=ctx.app_graph,
+            valid_tool_ids=ctx.valid_tool_ids,
+            sop_summarizer_fn=ctx.sop_summarizer_fn,
+            session_dir=ctx.session_dir,
+            top_status_data=ctx.top_status_data,
+            status_data=ctx.status_data,
+            app=ctx.app,
+            console=ctx.console,
+            set_status_fn=lambda text: repl_set_status(ctx, text),
+            wait_confirm_fn=lambda: repl_wait_confirm(ctx),
+        )
+
+    # 非 composite 工具：走原子 dispatch
+    ctx.console.print(
+        f"[dim][ToolDispatcher] 原子工具调用: {tool_id}"
+        f"({', '.join(f'{k}={v}' for k, v in args.items())})[/dim]"
+    )
+    return ctx.tool_dispatcher.dispatch(tool_id, args)
+
+
 async def _run_coordinator_and_execute(ctx: REPLContext) -> None:
-    """运行 UserCoordinator → TTS 播报 → IS_EXECUTE 判断 → SOP 执行。"""
+    """运行 UserCoordinator → TTS 播报 → ToolDispatcher 路由 → SOP 执行。"""
     from repl import print_agent_message
     from repl.execution.llm_runner import run_llm_node
-    from repl.execution.execution_controller import execute_sop_flow
     from utils.tts_engine import tts_say
 
     repl_set_status(ctx, "分析中...")
@@ -397,15 +453,10 @@ async def _run_coordinator_and_execute(ctx: REPLContext) -> None:
     )
     repl_set_status(ctx, ctx.state.get("matched_sop_id", ""))
 
-    # --- 判断模式 ---
-    if ctx.state.get("is_execute") == "true":
-        result = await execute_sop_flow(
-            ctx.state, ctx.resources, ctx.app_graph, ctx.valid_tool_ids,
-            ctx.task_compactor_fn, ctx.session_dir,
-            ctx.top_status_data, ctx.status_data, ctx.app, ctx.console,
-            lambda text: repl_set_status(ctx, text),
-            lambda: repl_wait_confirm(ctx),
-        )
+    # --- 通过 ToolDispatcher 统一路由 tool_call ---
+    tool_call_str = ctx.state.get("tool_call", "")
+    if tool_call_str and tool_call_str != "NONE":
+        result = await _route_tool_call(ctx, tool_call_str)
         # execute_sop_flow 返回 feedback dict 表示用户拒绝执行
         if isinstance(result, dict) and "feedback" in result:
             user_msg = result["feedback"]

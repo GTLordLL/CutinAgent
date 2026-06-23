@@ -1,7 +1,7 @@
 """批量测试操作类 Git SOP：GIT_SMART_COMMIT, GIT_BRANCH_CLEANUP。
 
 在 tests/demo_environments/ 预搭建的 tmp 仓库中运行完整 SOP 流程。
-每个 SOP 先加载 markdown 填充 state，再执行图，最后 TaskCompactor。
+每个 SOP 先加载 markdown 填充 state，再执行图，最后 SopSummarizer。
 """
 
 import os
@@ -19,7 +19,7 @@ from utils.debug_logger import set_session_dir
 from data_nodes.VariableStore import clear as clear_variables
 from repl.execution.sop_runner import _iterate_graph_stream
 from repl.execution.llm_runner import run_llm_node_sync
-from llm_nodes.TaskCompactorNode import task_compactor_node
+from llm_nodes.SopSummarizerNode import sop_summarizer_node
 from repl.state.state_manager import reset_sop_state
 
 # 颜色
@@ -51,7 +51,7 @@ def run_sop_test(sop_id: str, resources, app_graph, original_cwd: str) -> dict:
 
     1. 加载 SOP markdown → 填充 state
     2. 运行 SOP 执行图
-    3. 运行 TaskCompactor
+    3. 运行 SopSummarizer
     4. 断言验证
     """
     demo_dir = DEMOS[sop_id]["dir"]
@@ -133,13 +133,13 @@ def run_sop_test(sop_id: str, resources, app_graph, original_cwd: str) -> dict:
                     "summary": no["output"].get("tool_summary", ""),
                 })
 
-        # ── 4. TaskCompactor ──
+        # ── 4. SopSummarizer ──
         try:
-            compactor_fn = task_compactor_node(resources, headless=True)
-            compactor_result, _ = run_llm_node_sync("TaskCompactor", compactor_fn, state)
-            state.update(compactor_result)
+            summarizer_fn = sop_summarizer_node(resources, headless=True)
+            summarizer_result, _ = run_llm_node_sync("SopSummarizer", summarizer_fn, state)
+            state.update(summarizer_result)
         except Exception as e:
-            print(f"  {C_YELLOW}TaskCompactor 失败（非致命）: {e}{C_RESET}")
+            print(f"  {C_YELLOW}SopSummarizer 失败（非致命）: {e}{C_RESET}")
 
         total_elapsed = time.time() - start_time
         result["elapsed"] = total_elapsed

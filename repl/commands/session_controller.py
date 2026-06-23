@@ -143,8 +143,7 @@ async def handle_show_sop_picker(sop_picker_state: dict, state: dict,
     for _, row in resources.sops_df.iterrows():
         sops.append({
             "sop_id": row["SOP_ID"],
-            "objective": row["Objective"],
-            "description": row.get("Description", ""),
+            "description": row.get("Func_Desc", ""),
         })
 
     current_ids = set(state.get("sop_ids", []))

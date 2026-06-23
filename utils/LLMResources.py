@@ -6,6 +6,7 @@ from user.config.load_model_config import load_model_config, get_ollama_url
 from utils.load_prompts import load_prompt_file
 from utils.load_csv import load_csv_df
 from utils.sop_loader import load_sop_markdown
+from utils.llm_errors import check_ollama_connectivity
 from langchain_ollama import ChatOllama
 
 
@@ -51,6 +52,12 @@ def initialize_resources() -> LLMResources:
     if default_llm is None and llms:
         default_llm = list(llms.values())[0]
 
+    # 2.5 检测 Ollama 连通性（提前发现连接问题，避免后续大段报错）
+    ok, msg = check_ollama_connectivity(base_url)
+    if not ok:
+        print(f"\n⚠️  {msg}")
+        print("  请确认 Ollama 已启动后再执行操作。\n")
+
     # 3. 加载 Prompts
     prompts = {
         "user_coordinator_thinker": load_prompt_file("./prompts/user_coordinator/thinker.md"),
@@ -59,10 +66,9 @@ def initialize_resources() -> LLMResources:
         "problem_analyzer_formatter": load_prompt_file("./prompts/problem_analyzer/formatter.md"),
         "compactor_thinker": load_prompt_file("./prompts/compactor/thinker.md"),
         "compactor_formatter": load_prompt_file("./prompts/compactor/formatter.md"),
-        "chat_compactor_thinker": load_prompt_file("./prompts/chat_compactor/thinker.md"),
-        "chat_compactor_formatter": load_prompt_file("./prompts/chat_compactor/formatter.md"),
         "sop_execution_scheduler_thinker": load_prompt_file("./prompts/sop_execution_scheduler/thinker.md"),
         "sop_execution_scheduler_formatter": load_prompt_file("./prompts/sop_execution_scheduler/formatter.md"),
+        "sop_summarizer": load_prompt_file("./prompts/sop_summarizer.md"),
     }
 
     # 4. 加载工具和 SOP 索引

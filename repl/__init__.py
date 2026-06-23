@@ -55,7 +55,7 @@ from repl.pickers.sop_picker import (
 )
 from repl.execution.sop_runner import run_sop_graph
 from repl.execution.llm_runner import run_llm_node, fmt_elapsed
-from repl.execution.compaction_controller import run_chat_compactor, try_auto_compact
+from repl.execution.compaction_controller import run_compactor, try_auto_compact
 from repl.commands.session_controller import (
     save_current_if_dirty,
     restore_session_fields,
@@ -141,7 +141,7 @@ __all__ = [
     "SOP_PICKER_HEIGHT",
     "run_llm_node",
     "fmt_elapsed",
-    "run_chat_compactor",
+    "run_compactor",
     "try_auto_compact",
     "save_current_if_dirty",
     "restore_session_fields",

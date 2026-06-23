@@ -9,13 +9,16 @@ import signal
 
 from utils.LLMResources import initialize_resources
 from utils.sop_loader import load_sop_markdown
+from utils.llm_errors import LLMConnectionError
+from utils.error_writer import write_error
 from graph.Builder import build_graph
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
-from llm_nodes.TaskCompactorNode import task_compactor_node
+from llm_nodes.SopSummarizerNode import sop_summarizer_node
 from repl.state.state_manager import create_initial_state
 from repl.state.session_manager import generate_session_id, create_session_dir, write_run_summary
 from repl.execution.llm_runner import run_llm_node_sync
 from repl.execution.execution_controller import execute_sop_flow_headless
+from tools.ToolDispatcher import ToolDispatcher
 from cli.output_formatter import HeadlessRunResult, format_plain, format_json, format_json_full
 
 
@@ -26,6 +29,25 @@ class TimeoutError(Exception):
 
 def _timeout_handler(signum, frame):
     raise TimeoutError("执行超时")
+
+
+def _make_headless_composite_executor():
+    """工厂函数：返回 headless 版 composite 工具执行回调。
+
+    与 main.py 的 _make_composite_executor 对应，但委派给 execute_sop_flow_headless。
+    """
+    async def _exec(sop_id, args, **exec_kwargs):
+        state = exec_kwargs.pop("state", {})
+        state["matched_sop_id"] = sop_id
+        if args:
+            args_str = ", ".join(
+                f"{k}={repr(v)}" for k, v in args.items()
+            )
+            state["tool_call"] = f"{sop_id}({args_str})"
+        else:
+            state["tool_call"] = f"{sop_id}()"
+        return execute_sop_flow_headless(state=state, **exec_kwargs)
+    return _exec
 
 
 def run_headless(args) -> int:
@@ -52,6 +74,13 @@ def run_headless(args) -> int:
 
     # ── 2. 编译 SOP 执行图（headless 模式，无终端输出）──
     app_graph = build_graph(resources, headless=True)
+
+    # ── 2b. 创建 ToolDispatcher（headless composite_executor 闭包）──
+    tool_dispatcher = ToolDispatcher(
+        tools_df=resources.tools_df,
+        sops_df=resources.sops_df,
+        composite_executor=_make_headless_composite_executor(),
+    )
 
     # ── 3. 会话目录 ──
     session_dir = args.session_dir if hasattr(args, 'session_dir') and args.session_dir else create_session_dir()
@@ -94,12 +123,20 @@ def run_headless(args) -> int:
             error=f"执行超时（{timeout}s）",
             total_duration_s=time.time() - t_total_start,
         )
-    except Exception as e:
-        import traceback
+    except LLMConnectionError as e:
+        error_path = write_error(e, context="Headless 模式 LLM 连接失败")
         result = HeadlessRunResult(
             status="error",
             sop_id=getattr(args, 'sop', ''),
-            error=f"未预期的错误: {e}\n{traceback.format_exc()}",
+            error=f"{e}\n详细错误: {error_path}",
+            total_duration_s=time.time() - t_total_start,
+        )
+    except Exception as e:
+        error_path = write_error(e, context="Headless 模式未预期错误")
+        result = HeadlessRunResult(
+            status="error",
+            sop_id=getattr(args, 'sop', ''),
+            error=f"未预期的错误: {e}\n详细错误: {error_path}",
             total_duration_s=time.time() - t_total_start,
         )
     finally:
@@ -116,7 +153,8 @@ def _execute_direct_sop(state, resources, app_graph, args, session_dir) -> Headl
     加载 SOP markdown，填充 state 的 SOP 字段，设置 IS_EXECUTE=true，
     然后进入 execute_sop_flow_headless。
     """
-    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist())
+    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist()) \
+                   | set(resources.sops_df["SOP_ID"].tolist())
 
     # 加载 SOP
     try:
@@ -139,19 +177,17 @@ def _execute_direct_sop(state, resources, app_graph, args, session_dir) -> Headl
         if sop_md.get("retry_limit", "3").strip().isdigit()
         else 3
     )
-    state["is_execute"] = "true"
-    state["current_action"] = args.instruction
-    state["long_term_intent"] = f"执行 SOP: {args.sop}"
+    state["tool_call"] = f"{args.sop}()"
 
-    # 构建 TaskCompactor（headless 模式：不输出到终端）
-    task_compactor_fn = task_compactor_node(resources, headless=True)
+    # 构建 SopSummarizer（headless 模式：不输出到终端）
+    sop_summarizer_fn = sop_summarizer_node(resources, headless=True)
 
     return execute_sop_flow_headless(
         state=state,
         resources=resources,
         app_graph=app_graph,
         valid_tool_ids=valid_tool_ids,
-        task_compactor_fn=task_compactor_fn,
+        sop_summarizer_fn=sop_summarizer_fn,
         session_dir=session_dir,
     )
 
@@ -163,8 +199,9 @@ def _execute_with_coordinator(state, resources, app_graph, args, session_dir) ->
     如果 IS_EXECUTE=true，立即执行；否则返回 CHAT_MESSAGE。
     """
     coordinator_fn = user_coordinator_node(resources, headless=True)
-    task_compactor_fn = task_compactor_node(resources, headless=True)
-    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist())
+    sop_summarizer_fn = sop_summarizer_node(resources, headless=True)
+    valid_tool_ids = set(resources.tools_df["Tool_ID"].tolist()) \
+                   | set(resources.sops_df["SOP_ID"].tolist())
 
     # 运行 UserCoordinator
     coord_result, coord_elapsed = run_llm_node_sync(
@@ -173,10 +210,10 @@ def _execute_with_coordinator(state, resources, app_graph, args, session_dir) ->
     state.update(coord_result)
 
     chat_message = state.get("chat_message", "")
-    is_execute = state.get("is_execute", "false")
+    tool_call = state.get("tool_call", "")
     matched_sop = state.get("matched_sop_id", "")
 
-    if is_execute != "true":
+    if not tool_call or tool_call == "NONE":
         # 规划阶段：agent 还在收集信息或确认意图
         return HeadlessRunResult(
             status="success",
@@ -187,7 +224,7 @@ def _execute_with_coordinator(state, resources, app_graph, args, session_dir) ->
             total_duration_s=coord_elapsed,
         )
 
-    # IS_EXECUTE=true → 执行 SOP
+    # TOOL_CALL 非 NONE → 执行 SOP
     if not matched_sop or matched_sop not in set(resources.sops_df["SOP_ID"].tolist()):
         return HeadlessRunResult(
             status="error",
@@ -201,7 +238,7 @@ def _execute_with_coordinator(state, resources, app_graph, args, session_dir) ->
         resources=resources,
         app_graph=app_graph,
         valid_tool_ids=valid_tool_ids,
-        task_compactor_fn=task_compactor_fn,
+        sop_summarizer_fn=sop_summarizer_fn,
         session_dir=session_dir,
     )
 
@@ -227,9 +264,7 @@ def _output(result, args):
         r.total_rounds = result.get("total_rounds", 0)
         r.total_duration_s = result.get("total_duration_s", 0)
         r.node_outputs = result.get("node_outputs", [])
-        r.compactor_evaluation = result.get("compactor_evaluation", "")
-        r.compactor_conversation_summary = result.get("compactor_conversation_summary", "")
-        r.compactor_execution_summary = result.get("compactor_execution_summary", "")
+        r.sop_summary = result.get("sop_summary", "")
         r.variables = result.get("variables", {})
         r.final_report = result.get("final_report", "")
         r.session_dir = result.get("session_dir", "")

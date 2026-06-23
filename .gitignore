@@ -17,6 +17,7 @@ dist/
 history/
 user/sessions/
 user/config/user_config.json
+error/
 
 # --- 内部讨论 ---
 intro/discuss/

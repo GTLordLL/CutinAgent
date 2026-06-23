@@ -8,7 +8,7 @@ You are the autonomous information-gathering layer of an SOP-driven agent. Your 
 - **CURRENT_DIALOGUE**: Recent dialogue exchange between user and agent.
 - **CONVERSATION_HISTORY**: Compacted summaries of past dialogue from previous SOP cycles.
 - **EXECUTION_HISTORY**: Incrementally stored SOP execution results and tool execution results. Each round's gathered data is appended here.
-- **GATHERED_TOOLS**: `Tool_ID(param: type = default): """param_desc"""`. Provides parameter types, defaults, and value constraints.
+- **GATHERED_TOOLS**: `Tool_ID(param: type = default): """func_desc — param_desc"""`. Provides what the tool does, parameter types, defaults, and value constraints.
 
 ## Reasoning Instructions
 

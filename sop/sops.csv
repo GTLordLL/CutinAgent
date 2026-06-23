@@ -1,4 +1,4 @@
-SOP_ID,Objective,Description,Keywords
-GIT_SMART_COMMIT,"扫描Git工作区变更，自动生成conventional commit message并提交。","检查当前分支的未暂存变更，通过LLM分析diff内容生成高质量的commit message，然后暂存文件并执行git commit。","GIT, commit, stage, add, conventional-commits, message"
-GIT_BRANCH_CLEANUP,"扫描本地分支列表，识别已合并且可安全删除的过期分支并清理。","列出所有本地分支及其合并状态与最后提交日期，分析可安全删除的分支并执行清理。","GIT, branch, cleanup, merged, delete, stale"
-GIT_PR_CREATE,"分析当前分支变更，生成PR描述，经用户确认后推送并创建GitHub Pull Request。","获取领先提交和完整diff，通过LLM生成结构化PR描述，INTERRUPT等待用户确认后推送到origin并创建GitHub PR。合并了原GIT_PR_PREP的只读预览能力。","GIT, PR, pull-request, description, generate, prepare, push, create, publish, github"
+SOP_ID,Keywords,Tool_Type,Func_Desc,Args_Schema,param_desc
+GIT_SMART_COMMIT,"GIT, commit, stage, add, conventional-commits, message",composite,"扫描Git工作区变更，自动生成conventional commit message并提交。","{""files"": ""str (default . 表示全部)""}",files: 要提交的文件路径，默认'.'表示全部。
+GIT_BRANCH_CLEANUP,"GIT, branch, cleanup, merged, delete, stale",composite,"扫描本地分支列表，识别已合并且可安全删除的过期分支并清理。",{},无需参数。
+GIT_PR_CREATE,"GIT, PR, pull-request, description, generate, prepare, push, create, publish, github",composite,"分析当前分支变更，生成PR描述，经用户确认后推送并创建GitHub Pull Request。",{},无需参数。

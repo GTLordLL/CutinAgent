@@ -2,30 +2,27 @@
 import os
 import re
 
+from parsers.tool_call import _build_tool_signature
+
 
 def build_sop_library_index(sops_df) -> str:
-    """从CSV索引构造 SOP 匹配用的精简文本（含 Objective 和 Description，不含 Keywords 和 Plan_Steps）。"""
+    """从CSV索引构造 SOP 匹配用的精简文本（Python 函数签名格式，含 Func_Desc + 参数签名）。"""
     lines = []
     for _, row in sops_df.iterrows():
-        sid = row["SOP_ID"]
-        obj = row["Objective"]
-        desc = row.get("Description", "")
-        lines.append(f"{sid} | {obj} | {desc}")
+        lines.append(_build_tool_signature(row))
     return "\n".join(lines)
 
 
 def build_sop_library_from_ids(sops_df, sop_ids: list[str]) -> str:
-    """根据指定的 sop_ids 列表构造 SOP 匹配文本。
+    """根据指定的 sop_ids 列表构造 SOP 匹配文本（Python 函数签名格式）。
 
     只输出 sop_ids 中存在的 SOP；不存在的 ID 静默跳过。
-    格式与 build_sop_library_index() 相同：SOP_ID | Objective | Description
+    格式：SOP_ID(params): \"\"\"Func_Desc — param_desc\"\"\"
     """
     if not sop_ids:
         return (
             "No executable SOPs are available. "
-            "You may chat with the user and suggest SOP recommendations, "
-            "but entering the task execution phase is prohibited "
-            "(IS_EXECUTE must always be false)."
+            "You may chat with the user and suggest SOP recommendations."
         )
 
     ids_set = set(sop_ids)
@@ -33,9 +30,7 @@ def build_sop_library_from_ids(sops_df, sop_ids: list[str]) -> str:
     for _, row in sops_df.iterrows():
         sid = row["SOP_ID"]
         if sid in ids_set:
-            obj = row["Objective"]
-            desc = row.get("Description", "")
-            lines.append(f"{sid} | {obj} | {desc}")
+            lines.append(_build_tool_signature(row))
     return "\n".join(lines)
 
 

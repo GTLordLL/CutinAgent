@@ -1,10 +1,10 @@
 """UserCoordinator LLM 节点。
 
-人机协作网关：SOP 匹配 + 意图推断 + 三级渐进确认 + IS_EXECUTE 代码闸门。
+人机协作网关：意图分类 → SOP 匹配 → 参数推导 → TOOL_CALL 输出。
 Thinker (temp 0.4) + Formatter (temp 0.0) 双阶段。
 
-输出五字段：CHAT_MESSAGE（始终输出）, SOP_ID, CURRENT_ACTION, LONG_TERM_INTENT, IS_EXECUTE。
-IS_EXECUTE 为总闸：false 时渐进式确认，true 时全部确认完毕可执行。
+输出二字段：CHAT_MESSAGE, TOOL_CALL（Python 函数调用语法或 NONE）。
+TOOL_CALL 非 NONE 即表示已匹配 SOP 并填好参数，可进入外部确认。
 """
 
 from rich.console import Console
@@ -45,12 +45,15 @@ def user_coordinator_node(resources, headless=False):
         from validator.UserCoordinatorValidator import validate_coordinator_output
 
         def map_result(parsed, thinker_tokens, **ctx):
+            tool_call = parsed.get("tool_call", "")
+            if tool_call and tool_call.upper() != "NONE":
+                matched_sop_id = tool_call.split("(")[0].strip()
+            else:
+                matched_sop_id = ""
             return {
                 "chat_message": parsed.get("chat_message", ""),
-                "matched_sop_id": parsed.get("sop_id", ""),
-                "current_action": parsed.get("current_action", ""),
-                "long_term_intent": parsed.get("long_term_intent", ""),
-                "is_execute": parsed.get("is_execute", "false"),
+                "matched_sop_id": matched_sop_id,
+                "tool_call": tool_call if tool_call.upper() != "NONE" else "",
                 "thinker_input_tokens": thinker_tokens.get("input", 0) if thinker_tokens else 0,
             }
 
@@ -67,10 +70,8 @@ def user_coordinator_node(resources, headless=False):
             map_result=map_result,
             fallback_result={
                 "chat_message": "抱歉，我暂时无法理解您的需求。能换个方式描述一下吗？",
-                "sop_id": "",
-                "current_action": "",
-                "long_term_intent": "",
-                "is_execute": "false",
+                "matched_sop_id": "",
+                "tool_call": "",
             },
             thinker_label="Thinker",
             formatter_label="Formatter",

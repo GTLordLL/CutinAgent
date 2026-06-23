@@ -1,7 +1,7 @@
 """通用 LLM 节点执行包装器。
 
 封装 run_in_executor + _runtime_timer 模式，消除 main.py 中
-UserCoordinator / ChatCompactor 的三处重复（~51行）。
+UserCoordinator / Compactor 的三处重复（~51行）。
 
 同时提供 headless 同步版本 run_llm_node_sync，供 CLI 模式使用。
 """
@@ -9,6 +9,7 @@ UserCoordinator / ChatCompactor 的三处重复（~51行）。
 import asyncio
 import time
 from utils.cancel_token import is_cancelled
+from utils.llm_errors import LLMConnectionError
 
 
 def fmt_elapsed(seconds: float) -> str:
@@ -35,7 +36,11 @@ def run_llm_node_sync(label: str, node_fn, state: dict) -> tuple[dict, float]:
         (result_dict, elapsed_seconds)
     """
     t_start = time.time()
-    result = node_fn(state)
+    try:
+        result = node_fn(state)
+    except LLMConnectionError as e:
+        e.add_context(f"[{label}]")
+        raise
     elapsed = time.time() - t_start
     return result, elapsed
 
@@ -78,6 +83,10 @@ async def run_llm_node(label: str, node_fn, state: dict,
 
     try:
         result = await loop.run_in_executor(None, node_fn, state)
+    except LLMConnectionError as e:
+        # 附加节点上下文后重新抛出，让上层统一展示
+        e.add_context(f"[{label}]")
+        raise
     finally:
         stop_event.set()
         await timer_task
