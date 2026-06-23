@@ -9,6 +9,8 @@ import signal
 
 from utils.LLMResources import initialize_resources
 from utils.sop_loader import load_sop_markdown
+from utils.llm_errors import LLMConnectionError
+from utils.error_writer import write_error
 from graph.Builder import build_graph
 from llm_nodes.UserCoordinatorNode import user_coordinator_node
 from llm_nodes.SopSummarizerNode import sop_summarizer_node
@@ -121,12 +123,20 @@ def run_headless(args) -> int:
             error=f"执行超时（{timeout}s）",
             total_duration_s=time.time() - t_total_start,
         )
-    except Exception as e:
-        import traceback
+    except LLMConnectionError as e:
+        error_path = write_error(e, context="Headless 模式 LLM 连接失败")
         result = HeadlessRunResult(
             status="error",
             sop_id=getattr(args, 'sop', ''),
-            error=f"未预期的错误: {e}\n{traceback.format_exc()}",
+            error=f"{e}\n详细错误: {error_path}",
+            total_duration_s=time.time() - t_total_start,
+        )
+    except Exception as e:
+        error_path = write_error(e, context="Headless 模式未预期错误")
+        result = HeadlessRunResult(
+            status="error",
+            sop_id=getattr(args, 'sop', ''),
+            error=f"未预期的错误: {e}\n详细错误: {error_path}",
             total_duration_s=time.time() - t_total_start,
         )
     finally:

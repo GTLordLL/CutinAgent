@@ -11,6 +11,7 @@ from typing import Callable
 from langchain_core.messages import HumanMessage
 from rich.console import Console
 from utils.cancel_token import check_cancel
+from utils.llm_errors import LLMConnectionError, CONNECTION_EXCEPTIONS
 
 
 def stream_llm(llm, prompt_text: str, label: str = "",
@@ -54,36 +55,40 @@ def stream_llm(llm, prompt_text: str, label: str = "",
             sys.stdout.write(text)
             sys.stdout.flush()
 
-    for chunk in llm.stream([HumanMessage(content=prompt_text)]):
-        token = ""
-        if hasattr(chunk, "content") and chunk.content:
-            token = chunk.content
+    try:
+        for chunk in llm.stream([HumanMessage(content=prompt_text)]):
+            token = ""
+            if hasattr(chunk, "content") and chunk.content:
+                token = chunk.content
 
-        if token:
-            full_text += token
+            if token:
+                full_text += token
 
-        check_cancel()
+            check_cancel()
 
-        if not usage and hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
-            raw = dict(chunk.usage_metadata)
-            usage = {
-                "input": raw.get("input_tokens", 0),
-                "output": raw.get("output_tokens", 0),
-                "total": raw.get("total_tokens", 0),
-            }
+            if not usage and hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                raw = dict(chunk.usage_metadata)
+                usage = {
+                    "input": raw.get("input_tokens", 0),
+                    "output": raw.get("output_tokens", 0),
+                    "total": raw.get("total_tokens", 0),
+                }
 
-        if buffer_interval > 0 and not live_callback:
-            if last_flush_time is None:
-                last_flush_time = time.time()
-            now = time.time()
-            if now - last_flush_time >= buffer_interval:
-                new_text = full_text[last_flush_pos:]
-                if new_text:
-                    _write(new_text + "\n")
-                last_flush_pos = len(full_text)
-                last_flush_time = now
-        elif token and not live_callback:
-            _write(token)
+            if buffer_interval > 0 and not live_callback:
+                if last_flush_time is None:
+                    last_flush_time = time.time()
+                now = time.time()
+                if now - last_flush_time >= buffer_interval:
+                    new_text = full_text[last_flush_pos:]
+                    if new_text:
+                        _write(new_text + "\n")
+                    last_flush_pos = len(full_text)
+                    last_flush_time = now
+            elif token and not live_callback:
+                _write(token)
+    except CONNECTION_EXCEPTIONS as e:
+        base_url = getattr(llm, "base_url", "")
+        raise LLMConnectionError(detail=str(e), base_url=base_url) from e
 
     if buffer_interval > 0 and not live_callback:
         remaining = full_text[last_flush_pos:]

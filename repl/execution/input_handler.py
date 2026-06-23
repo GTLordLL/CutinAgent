@@ -15,12 +15,13 @@
 
 import asyncio
 import shutil
-import traceback
 
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from repl.repl_context import REPLContext
 from utils.cancel_token import CancellationError, reset_cancel
+from utils.llm_errors import LLMConnectionError
+from utils.error_writer import write_error
 
 
 # ── 模块级辅助函数（原 run_repl 闭包）──────────────────────────
@@ -89,8 +90,18 @@ async def handle_user_input(ctx: REPLContext, user_msg: str) -> None:
         except CancellationError:
             ctx.console.print("\n[bold yellow]已停止当前执行。[/bold yellow]")
             reset_cancel()
-        except Exception:
-            traceback.print_exc()
+        except LLMConnectionError as e:
+            # 连接错误：友好提示 + 写 error 文件
+            error_path = write_error(e, context="LLM 连接失败")
+            ctx.console.print(f"\n[bold red]{e}[/bold red]")
+            ctx.console.print(f"[dim]详细错误已写入: {error_path}[/dim]")
+        except Exception as e:
+            # 其他异常：写 error 文件，终端仅显示文件路径
+            error_path = write_error(e, context="未预期的运行时错误")
+            ctx.console.print(
+                f"\n[bold red]执行出错: {e}[/bold red]\n"
+                f"[dim]详细错误已写入: {error_path}[/dim]"
+            )
         finally:
             ctx.flags["processing"] = False
             repl_set_status(ctx, "")

@@ -14,6 +14,8 @@ from rich.panel import Panel
 
 from utils.tts_engine import tts_say
 from utils.cancel_token import CancellationError, check_cancel
+from utils.llm_errors import LLMConnectionError
+from utils.error_writer import write_error
 from data_nodes.VariableStore import clear as clear_variables, get_all as get_all_variables
 from repl.state.state_manager import reset_sop_state
 from repl.execution.sop_runner import run_sop_graph, _iterate_graph_stream
@@ -166,11 +168,20 @@ async def _execute_sop_with_timer(
             await asyncio.sleep(0.3)
         except CancellationError:
             raise  # 让 finally 清理定时器
+        except LLMConnectionError as e:
+            error_path = write_error(e, context="SOP 执行阶段 LLM 连接失败")
+            console.print(f"[bold red]{e}[/bold red]")
+            console.print(f"[dim]详细错误已写入: {error_path}[/dim]")
+            tts_say("无法连接大模型，请检查 Ollama 是否已启动")
+            state["current_dialogue"].append(
+                {"role": "error", "content": str(e)}
+            )
+            return state, None, "", 0, sop_start, 0.0
         except Exception as e:
+            error_path = write_error(e, context="SOP 执行崩溃")
             console.print(f"[bold red]SOP 执行崩溃: {e}[/bold red]")
+            console.print(f"[dim]详细错误已写入: {error_path}[/dim]")
             tts_say(f"SOP 执行崩溃: {e}")
-            import traceback
-            traceback.print_exc()
             state["current_dialogue"].append(
                 {"role": "error", "content": f"SOP execution failed: {e}"}
             )
@@ -371,11 +382,17 @@ def execute_sop_flow_headless(
             state, node_timings, final_task_status, total_rounds, node_outputs = (
                 _iterate_graph_stream(app_graph, state, node_callback=None)
             )
-        except Exception as e:
-            import traceback
+        except LLMConnectionError as e:
+            error_path = write_error(e, context="SOP 执行阶段 LLM 连接失败")
             result.status = "error"
             result.sop_id = saved_sop_id
-            result.error = f"SOP 执行崩溃: {e}\n{traceback.format_exc()}"
+            result.error = f"{e}\n详细错误: {error_path}"
+            return result
+        except Exception as e:
+            error_path = write_error(e, context="SOP 执行崩溃")
+            result.status = "error"
+            result.sop_id = saved_sop_id
+            result.error = f"SOP 执行崩溃: {e}\n详细错误: {error_path}"
             return result
 
         sop_elapsed = time.time() - t_start

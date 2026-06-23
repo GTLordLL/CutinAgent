@@ -1,6 +1,7 @@
 import os
 from langchain_ollama import ChatOllama
 from utils.streaming import stream_llm
+from utils.llm_errors import LLMConnectionError
 from repl.config_manager import get_config
 
 _PROMPT_DIR = os.path.join(
@@ -66,6 +67,8 @@ def generate_pr_description(diff: str, commits: str) -> dict:
             "token_usage": usage,
         }
 
+    except LLMConnectionError as e:
+        return {"status": "失败", "summary": str(e), "detail": ""}
     except Exception as e:
         return {
             "status": "失败",
